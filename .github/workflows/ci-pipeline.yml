@@ -1,0 +1,25 @@
+name: CI Pipeline
+
+on:
+  push
+
+jobs:
+  ci-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.10.0
+          architecture: x64
+          cache: 'pip'
+      - name: Install pipenv
+        run: pip install pipenv
+      - name: Install dependencies
+        run: pipenv install
+      - name: Run flake8
+        run: flake8 *.py
+      - name: Run pylint
+        run: pylint *.py
