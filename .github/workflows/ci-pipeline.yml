@@ -20,6 +20,6 @@ jobs:
       - name: Install dependencies
         run: pipenv install --dev
       - name: Run flake8
-        run: flake8 *.py
+        run: pipenv run flake8 *.py
       - name: Run pylint
-        run: pylint *.py
+        run: pipenv run pylint *.py
