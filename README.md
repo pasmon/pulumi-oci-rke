@@ -1,3 +1,4 @@
+![Pipeline Status](https://github.com/pasmon/pulumi-oci-rke/actions/workflows/ci-pipeline.yml/badge.svg)
 # Provision Kubernetes Cluster To Oracle Cloud Infrastructure
 
 ## Requirements
