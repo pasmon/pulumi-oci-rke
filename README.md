@@ -1,59 +1,51 @@
 ![Pipeline Status](https://github.com/pasmon/pulumi-oci-rke/actions/workflows/ci-pipeline.yml/badge.svg)
-# Provision Kubernetes Cluster To Oracle Cloud Infrastructure
+# Provision Kubernetes Cluster (RKE) To Oracle Cloud Infrastructure
 
 ## Requirements
 
 - Oracle Cloud Infrastructure or something else for 2 instances
   - Docker in instances
 - Python
+  - Pipenv
 - Pulumi
 
 ## Install Rancher Kubernetes Engine (RKE)
 
-1. Create account to OCI for free, don't go for Stockholm region as currently there is no free instances available:
+1. Create account to Oracle Cloud for free:
+
    https://www.oracle.com/cloud/free/
 
-2. Create SSH keys in PEM format, either manually or letting OCI create them:
-   https://ocikb.com/create-keys-in-pem-format
+2. Setup OCI credentials:
 
-3. Modify `~/.oci/config` to correct path of your private SSH key
+   https://docs.oracle.com/en-us/iaas/Content/API/Concepts/apisigningkey.htm#Required_Keys_and_OCIDs
 
-4. Create 2 instances, and get their IP addresses
+3. Install Pulumi:
 
-5. Install and configure Docker:
-https://docs.docker.com/engine/install/
+   https://www.pulumi.com/docs/get-started/install/
 
-6. Open firewall ports for RKE, both in OCI security list and in instances:
-https://rancher.com/docs/rke/latest/en/os/#ports
-
-7. Install Pulumi:
-https://www.pulumi.com/docs/get-started/install/
-
-8. Install Python packages with pipenv (https://pipenv.pypa.io/en/latest/install/#installing-pipenv):
+4. Install Python packages with pipenv (https://pipenv.pypa.io/en/latest/install/#installing-pipenv):
 
     `pipenv install`
 
-9. Activate Python virtual environment:
+5. Activate Python virtual environment:
 
     `pipenv shell`
 
-10. Set the IP addresses and path to your private SSH key with Pulumi:
-```
-pulumi config set master_public_ip <master public IP>
-pulumi config set master_internal_ip <master internal IP>
-pulumi config set worker_public_ip <master public IP>
-pulumi config set worker_internal_ip <master internal IP>
-pulumi config set ssh_key_path <master public IP>
-```
+6. Set the OCI compartment ID, and path to your private and public SSH key with Pulumi:
 
-11. Deploy RKE with Pulumi:
+   `pulumi config set ssh-key-path <path to your private SSH key>`
+
+   `pulumi config set ssh-public-key-path <path to your public SSH key>`
+   
+   `pulumi config set --secret compartment-id <your OCI compartment ID>`
+
+7. Launch 2 free tier ARM instances to Oracle Cloud and deploy RKE with Pulumi:
 
     `pulumi up`
 
-### Ramblings
+Your Kubernetes configuration file should be available in `out/rke_kubeconfig`.
 
-OCI instance creation should've been automated with Pulumi but couldn't get it to work:
-https://github.com/pulumi-oci/pulumi-oci
+### Ramblings
 
 Was going to use RKE2 but no dice with ARM currently:
 https://github.com/rancher/rke2/issues/817

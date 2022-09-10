@@ -5,13 +5,14 @@ name = "pypi"
 
 [packages]
 pulumi = "*"
-#pulumi_oci = {editable = true, path = "./pulumi_oci/sdk/python"}
-parver = "*"
 pulumi-rke = "*"
+pulumi-oci = "*"
+pulumi-command = "*"
 
 [dev-packages]
 pylint = "*"
 flake8 = "*"
+black = "*"
 
 [requires]
 python_version = "3.10"
