@@ -1,3 +1,5 @@
+"""Pulumi program to deploy RKE cluster to 2 free tier nodes on Oracle Cloud."""
+
 import os
 import base64
 
@@ -11,14 +13,14 @@ ssh_key_path = config.require("ssh-key-path")
 ssh_public_key_path = config.require("ssh-public-key-path")
 compartment_id = config.require("compartment-id")
 
-with open(ssh_key_path, "r") as ssh_key_file:
+with open(ssh_key_path, "r", encoding="utf-8") as ssh_key_file:
     ssh_key_data = ssh_key_file.read()
 
-with open(ssh_public_key_path, "r") as ssh_public_file:
+with open(ssh_public_key_path, "r", encoding="utf-8") as ssh_public_file:
     ssh_public_key = ssh_public_file.read()
 
 # install docker and do modifications for rke installation
-user_data = """#!/bin/bash -x
+USER_DATA = """#!/bin/bash -x
 sudo apt-get remove -y ufw
 sudo iptables -F
 sudo netfilter-persistent save
@@ -33,8 +35,8 @@ sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
 sudo sysctl -p
 echo 'AllowTcpForwarding yes' | sudo tee -a /etc/ssh/sshd_config
 """
-encodedBytes = base64.b64encode(user_data.encode("utf-8"))
-user_data_base64 = str(encodedBytes, "utf-8")
+encodedBytes = base64.b64encode(USER_DATA.encode("utf-8"))
+USER_DATA_BASE64 = str(encodedBytes, "utf-8")
 
 # TODO: lookup compartment_id
 vcn = oci.core.Vcn(
@@ -160,7 +162,7 @@ vm1 = oci.core.Instance(
     ),
     metadata={
         "ssh_authorized_keys": ssh_public_key,
-        "user_data": user_data_base64,
+        "user_data": USER_DATA_BASE64,
     },
     opts=pulumi.ResourceOptions(delete_before_replace=True),
 )
@@ -185,7 +187,7 @@ vm2 = oci.core.Instance(
     ),
     metadata={
         "ssh_authorized_keys": ssh_public_key,
-        "user_data": user_data_base64,
+        "user_data": USER_DATA_BASE64,
     },
     opts=pulumi.ResourceOptions(delete_before_replace=True),
 )
