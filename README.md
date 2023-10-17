@@ -8,6 +8,25 @@
   - Pipenv
 - Pulumi
 
+## Running the Unit Tests
+
+The unit tests are located in the `tests/` directory. They are designed to test the functionality of the code in the `__main__.py` file.
+
+Running these tests is important because it helps ensure that the code is working as expected. It also helps catch any issues or bugs that might have been introduced during development.
+
+To run the unit tests, use the following command:
+
+```
+python -m unittest tests/test_main.py
+```
+
+This command will run all the tests in the `tests/test_main.py` file and display the results in the terminal.
+
+### Ramblings
+
+Was going to use RKE2 but no dice with ARM currently:
+https://github.com/rancher/rke2/issues/817
+
 ## Install Rancher Kubernetes Engine (RKE)
 
 1. Create account to Oracle Cloud for free:
