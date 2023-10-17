@@ -23,7 +23,8 @@ with open(ssh_public_key_path, "r", encoding="utf-8") as ssh_public_file:
 USER_DATA = """#!/bin/bash -x
 sudo iptables -F
 sudo netfilter-persistent save
-for pkg in ufw docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove -y $pkg; done
+for pkg in ufw docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; \
+    do sudo apt-get remove -y $pkg; done
 # Add Docker's official GPG key:
 sudo apt-get update
 sudo apt-get install ca-certificates curl gnupg
@@ -32,12 +33,14 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o 
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 # Add the repository to Apt sources:
 echo \
-  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] \
+    https://download.docker.com/linux/ubuntu \
   "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt-get update
 VERSION_STRING=5:20.10.24~3-0~ubuntu-jammy
-sudo apt-get install -y docker-ce=$VERSION_STRING docker-ce-cli=$VERSION_STRING containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt-get install -y docker-ce=$VERSION_STRING docker-ce-cli=$VERSION_STRING \
+    containerd.io docker-buildx-plugin docker-compose-plugin
 sudo groupadd docker
 sudo usermod -aG docker ubuntu
 sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
