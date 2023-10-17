@@ -4,7 +4,9 @@ import base64
 import __main__ as main
 
 class TestMain(unittest.TestCase):
+    """Unit tests for the __main__.py file."""
     def setUp(self):
+        """Set up variables for the tests."""
         self.ssh_key_data = "ssh-key-data"
         self.ssh_public_key = "ssh-public-key"
         self.user_data = main.USER_DATA
@@ -35,7 +37,9 @@ class TestMain(unittest.TestCase):
     import pulumi
     
     class TestMain(unittest.TestCase):
+        """Unit tests for the __main__.py file."""
         def setUp(self):
+            """Set up variables for the tests."""
             self.ssh_key_data = "ssh-key-data"
             self.ssh_public_key = "ssh-public-key"
             self.user_data = main.USER_DATA
@@ -45,7 +49,6 @@ class TestMain(unittest.TestCase):
             self.route_table = oci.core.DefaultRouteTable("oci-routetable", self.compartment_id, self.vcn.default_route_table_id)
             self.security_group = oci.core.NetworkSecurityGroup("oci-securitygroup", self.compartment_id, self.vcn.id)
             self.subnet = oci.core.Subnet("oci-subnet", "10.0.0.0/24", self.compartment_id, self.vcn.id, self.route_table.id)
-    
         @mock.patch('pulumi_oci.core.Vcn', return_value=self.vcn)
         @mock.patch('pulumi_oci.core.InternetGateway')
         @mock.patch('pulumi_oci.core.DefaultRouteTable', return_value=self.route_table)
@@ -112,13 +115,15 @@ class TestMain(unittest.TestCase):
             assert mock_cluster.call_count == 1
     
         def tearDown(self):
+            """Clean up after each test."""
             pass
     
     if __name__ == "__main__":
         unittest.main()
 
-    def tearDown(self):
-        pass
+        def tearDown(self):
+            """Clean up after each test."""
+            pass
 
 if __name__ == "__main__":
     unittest.main()
