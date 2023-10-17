@@ -155,6 +155,20 @@ security_group_security_rule4 = oci.core.NetworkSecurityGroupSecurityRule(
 )
 
 def create_instance(name, display_name, subnet_id, security_group_id, ssh_public_key, user_data_base64):
+    """
+    Create an instance in Oracle Cloud Infrastructure (OCI).
+    
+    Args:
+        name (str): The name of the instance.
+        display_name (str): The display name of the instance.
+        subnet_id (str): The ID of the subnet in which the instance will be created.
+        security_group_id (str): The ID of the security group to which the instance will belong.
+        ssh_public_key (str): The public SSH key to be used for the instance.
+        user_data_base64 (str): The user data to be used for the instance, encoded in base64.
+        
+    Returns:
+        oci.core.Instance: The created instance.
+    """
     return oci.core.Instance(
         name,
         display_name=display_name,
