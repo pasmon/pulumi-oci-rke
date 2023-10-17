@@ -1,3 +1,11 @@
+import unittest
+
+import pulumi
+import pulumi_oci as oci
+import pulumi_rke as rke
+
+import __main__ as main
+
 class TestMain(unittest.TestCase):
     def setUp(self):
         self.config = pulumi.Config()
