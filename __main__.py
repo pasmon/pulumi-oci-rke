@@ -37,9 +37,9 @@ sudo chmod a+r /etc/apt/keyrings/docker.gpg
 echo \\
   "deb [arch="$(dpkg --print-architecture)" \\
   signed-by=/etc/apt/keyrings/docker.gpg] \\
-    https://download.docker.com/linux/ubuntu \\
-  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \\
+    https://download.docker.com/linux/ubuntu" | \\
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+echo "$(. /etc/os-release && echo "$VERSION_CODENAME") stable"
 sudo apt-get update
 VERSION_STRING=5:20.10.24~3-0~ubuntu-jammy
 for pkg in {PACKAGES_TO_INSTALL}; do sudo apt-get install -y $pkg; done
