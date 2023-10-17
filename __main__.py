@@ -47,7 +47,6 @@ echo 'AllowTcpForwarding yes' | sudo tee -a /etc/ssh/sshd_config
 encodedBytes = base64.b64encode(USER_DATA.encode("utf-8"))
 USER_DATA_BASE64 = str(encodedBytes, "utf-8")
 
-# TODO: lookup compartment_id
 vcn = oci.core.Vcn(
     "oci-vcn",
     compartment_id=compartment_id,
@@ -119,7 +118,6 @@ security_group_security_rule2 = oci.core.NetworkSecurityGroupSecurityRule(
     ),
 )
 
-# TODO: allow from specific ips
 security_group_security_rule3 = oci.core.NetworkSecurityGroupSecurityRule(
     "oci-securitygroup-rule3",
     network_security_group_id=security_group.id,
@@ -200,7 +198,6 @@ vm2 = oci.core.Instance(
     opts=pulumi.ResourceOptions(delete_before_replace=True),
 )
 
-# TODO: parametrize user
 # let's wait for VMs to run their cloud init to completion
 vm1_ready = remote.Command(
     "vm1-ready",
