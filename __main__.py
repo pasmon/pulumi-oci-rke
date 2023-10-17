@@ -34,10 +34,10 @@ sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 # Add the repository to Apt sources:
-echo \
-  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/ubuntu \
-  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+echo \\
+  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] \\
+    https://download.docker.com/linux/ubuntu \\
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \\
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt-get update
 VERSION_STRING=5:20.10.24~3-0~ubuntu-jammy
@@ -154,30 +154,25 @@ security_group_security_rule4 = oci.core.NetworkSecurityGroupSecurityRule(
     ),
 )
 
-def create_instance(name, display_name, subnet_id, security_group_id, ssh_public_key, user_data_base64):
+def create_instance(instance_config):
     """
     Create an instance in Oracle Cloud Infrastructure (OCI).
     
     Args:
-        name (str): The name of the instance.
-        display_name (str): The display name of the instance.
-        subnet_id (str): The ID of the subnet in which the instance will be created.
-        security_group_id (str): The ID of the security group to which the instance will belong.
-        ssh_public_key (str): The public SSH key to be used for the instance.
-        user_data_base64 (str): The user data to be used for the instance, encoded in base64.
+        instance_config (dict): A dictionary containing the configuration for the instance.
         
     Returns:
         oci.core.Instance: The created instance.
     """
     return oci.core.Instance(
-        name,
-        display_name=display_name,
+        instance_config['name'],
+        display_name=instance_config['display_name'],
         availability_domain="Dtqv:EU-STOCKHOLM-1-AD-1",
         compartment_id=compartment_id,
         shape="VM.Standard.A1.Flex",
         create_vnic_details=oci.core.InstanceCreateVnicDetailsArgs(
-            subnet_id=subnet_id,
-            nsg_ids=[security_group_id],
+            subnet_id=instance_config['subnet_id'],
+            nsg_ids=[instance_config['security_group_id']],
         ),
         source_details=oci.core.InstanceSourceDetailsArgs(
             source_id="ocid1.image.oc1.eu-stockholm-1.aaaaaaaabn32f7fcafa3mf3jim2yjlak4zbk6cqwpyolhspg2miozqephuha",
@@ -188,14 +183,31 @@ def create_instance(name, display_name, subnet_id, security_group_id, ssh_public
             ocpus=2,
         ),
         metadata={
-            "ssh_authorized_keys": ssh_public_key,
-            "user_data": user_data_base64,
+            "ssh_authorized_keys": instance_config['ssh_public_key'],
+            "user_data": instance_config['user_data_base64'],
         },
         opts=pulumi.ResourceOptions(delete_before_replace=True),
     )
 
-vm1 = create_instance("oci-master", "k8s-master", subnet.id, security_group.id, ssh_public_key, USER_DATA_BASE64)
-vm2 = create_instance("oci-worker", "k8s-worker", subnet.id, security_group.id, ssh_public_key, USER_DATA_BASE64)
+vm1_config = {
+    'name': "oci-master",
+    'display_name': "k8s-master",
+    'subnet_id': subnet.id,
+    'security_group_id': security_group.id,
+    'ssh_public_key': ssh_public_key,
+    'user_data_base64': USER_DATA_BASE64
+}
+vm1 = create_instance(vm1_config)
+
+vm2_config = {
+    'name': "oci-worker",
+    'display_name': "k8s-worker",
+    'subnet_id': subnet.id,
+    'security_group_id': security_group.id,
+    'ssh_public_key': ssh_public_key,
+    'user_data_base64': USER_DATA_BASE64
+}
+vm2 = create_instance(vm2_config)
 # let's wait for VMs to run their cloud init to completion
 vm1_ready = remote.Command(
     "vm1-ready",
