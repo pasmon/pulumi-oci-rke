@@ -27,6 +27,19 @@ class TestMain(unittest.TestCase):
         mock_open.assert_called_once_with("out/rke_kubeconfig", "w", encoding="utf8")
         mock_open().write.assert_called_once_with(kubeconfig_data)
 
+    @mock.patch('pulumi_oci.core.Vcn')
+    @mock.patch('pulumi_oci.core.InternetGateway')
+    @mock.patch('pulumi_oci.core.DefaultRouteTable')
+    @mock.patch('pulumi_oci.core.Subnet')
+    @mock.patch('pulumi_oci.core.NetworkSecurityGroup')
+    @mock.patch('pulumi_oci.core.NetworkSecurityGroupSecurityRule')
+    @mock.patch('pulumi_oci.core.Instance')
+    @mock.patch('pulumi_command.remote.Command')
+    @mock.patch('pulumi_rke.Cluster')
+    def test_main(self, mock_cluster, mock_command, mock_instance, mock_security_rule, mock_security_group, mock_subnet, mock_route_table, mock_internet_gateway, mock_vcn):
+        main.main()
+        # Add assertions to check that the Pulumi and OCI resources are created with the correct arguments
+
     def tearDown(self):
         pass
 
