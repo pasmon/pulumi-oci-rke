@@ -1,5 +1,5 @@
 import unittest
-from __main__ import new_business_logic_function1, new_business_logic_function2
+from business_logic import new_business_logic_function1, new_business_logic_function2
 
 class TestMain(unittest.TestCase):
 
