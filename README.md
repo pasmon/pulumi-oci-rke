@@ -1,4 +1,5 @@
 ![Pipeline Status](https://github.com/pasmon/pulumi-oci-rke/actions/workflows/ci-pipeline.yml/badge.svg)
+
 # Provision Kubernetes Cluster (RKE) To Oracle Cloud Infrastructure
 
 ## Requirements
@@ -16,13 +17,13 @@ Running these tests is important because it helps ensure that the code is workin
 
 To run the unit tests, use the following command:
 
-```
+```shell
 python -m unittest tests/test_main.py
 ```
 
 This command will run all the tests in the `tests/test_main.py` file and display the results in the terminal.
 
-### Ramblings
+### Additional Ramblings
 
 Was going to use RKE2 but no dice with ARM currently:
 https://github.com/rancher/rke2/issues/817
@@ -43,11 +44,11 @@ https://github.com/rancher/rke2/issues/817
 
 4. Install Python packages with pipenv (https://pipenv.pypa.io/en/latest/install/#installing-pipenv):
 
-    `pipenv install`
+   `pipenv install`
 
 5. Activate Python virtual environment:
 
-    `pipenv shell`
+   `pipenv shell`
 
 6. Set the OCI compartment ID, and path to your private and public SSH key with Pulumi:
 
@@ -65,7 +66,7 @@ https://github.com/rancher/rke2/issues/817
 
 7. Launch 2 free tier ARM instances to Oracle Cloud and deploy RKE with Pulumi:
 
-    `pulumi up`
+   `pulumi up`
 
 Your Kubernetes configuration file should be available in `out/rke_kubeconfig`
 so you can use commands like `KUBECONFIG=out/rke_kubeconfig kubectl ...`.
