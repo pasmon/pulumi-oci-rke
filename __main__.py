@@ -21,15 +21,24 @@ with open(ssh_public_key_path, "r", encoding="utf-8") as ssh_public_file:
 
 # install docker and do modifications for rke installation
 USER_DATA = """#!/bin/bash -x
-sudo apt-get remove -y ufw
 sudo iptables -F
 sudo netfilter-persistent save
-sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable"
+for pkg in ufw docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove -y $pkg; done
+# Add Docker's official GPG key:
 sudo apt-get update
-#sudo apt-cache policy docker-ce
-sudo apt-get install -y docker.io
+sudo apt-get install ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+# Add the repository to Apt sources:
+echo \
+  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+VERSION_STRING=5:20.10.24~3-0~ubuntu-jammy
+sudo apt-get install -y docker-ce=$VERSION_STRING docker-ce-cli=$VERSION_STRING containerd.io docker-buildx-plugin docker-compose-plugin
+sudo groupadd docker
 sudo usermod -aG docker ubuntu
 sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
 sudo sysctl -p
@@ -141,7 +150,6 @@ security_group_security_rule4 = oci.core.NetworkSecurityGroupSecurityRule(
     ),
 )
 
-# TODO: update source_id for ubuntu 22.04
 vm1 = oci.core.Instance(
     "oci-master",
     display_name="k8s-master",
@@ -153,7 +161,7 @@ vm1 = oci.core.Instance(
         nsg_ids=[security_group.id],
     ),
     source_details=oci.core.InstanceSourceDetailsArgs(
-        source_id="ocid1.image.oc1.eu-stockholm-1.aaaaaaaaicyhmukvotwdsfxgwk73p2z3kk344bxbg2ycwltyyktw26hz3kna",
+        source_id="ocid1.image.oc1.eu-stockholm-1.aaaaaaaabn32f7fcafa3mf3jim2yjlak4zbk6cqwpyolhspg2miozqephuha",
         source_type="image",
     ),
     shape_config=oci.core.InstanceShapeConfigArgs(
@@ -178,7 +186,7 @@ vm2 = oci.core.Instance(
         nsg_ids=[security_group.id],
     ),
     source_details=oci.core.InstanceSourceDetailsArgs(
-        source_id="ocid1.image.oc1.eu-stockholm-1.aaaaaaaaicyhmukvotwdsfxgwk73p2z3kk344bxbg2ycwltyyktw26hz3kna",
+        source_id="ocid1.image.oc1.eu-stockholm-1.aaaaaaaabn32f7fcafa3mf3jim2yjlak4zbk6cqwpyolhspg2miozqephuha",
         source_type="image",
     ),
     shape_config=oci.core.InstanceShapeConfigArgs(
@@ -248,17 +256,7 @@ rke_cluster = rke.Cluster(
     cluster_name="masterofclusters",
     ssh_agent_auth=False,
     ssh_key_path=ssh_key_path,
-    # fix the images to work with arm64
-    system_images=rke.ClusterSystemImagesArgs(
-        calico_node="rancher/mirrored-calico-node:v3.22.1",
-        calico_cni="rancher/mirrored-calico-cni:v3.22.1",
-        calico_controllers="rancher/mirrored-calico-kube-controllers:v3.22.1",
-        calico_flex_vol="rancher/mirrored-calico-pod2daemon-flexvol:v3.22.1",
-        calico_ctl="rancher/mirrored-calico-ctl:v3.22.1",
-        canal_cni="rancher/mirrored-calico-cni:v3.22.1",
-        canal_node="rancher/mirrored-calico-node:v3.22.1",
-        canal_flex_vol="rancher/mirrored-calico-pod2daemon-flexvol:v3.22.1",
-    ),
+    enable_cri_dockerd=True,
     opts=pulumi.ResourceOptions(depends_on=[vm1_ready, vm2_ready]),
 )
 

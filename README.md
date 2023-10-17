@@ -3,8 +3,7 @@
 
 ## Requirements
 
-- Oracle Cloud Infrastructure or something else for 2 instances
-  - Docker in instances
+- Oracle Cloud Infrastructure account
 - Python
   - Pipenv
 - Pulumi
@@ -33,17 +32,24 @@
 
 6. Set the OCI compartment ID, and path to your private and public SSH key with Pulumi:
 
+   `pulumi login --local`
+
+   `pulumi stack`
+
+   `pulumi stack select`
+
    `pulumi config set ssh-key-path <path to your private SSH key>`
 
    `pulumi config set ssh-public-key-path <path to your public SSH key>`
-   
+
    `pulumi config set --secret compartment-id <your OCI compartment ID>`
 
 7. Launch 2 free tier ARM instances to Oracle Cloud and deploy RKE with Pulumi:
 
     `pulumi up`
 
-Your Kubernetes configuration file should be available in `out/rke_kubeconfig`.
+Your Kubernetes configuration file should be available in `out/rke_kubeconfig`
+so you can use commands like `KUBECONFIG=out/rke_kubeconfig kubectl ...`.
 
 ### Ramblings
 
