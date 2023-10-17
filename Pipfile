@@ -13,6 +13,7 @@ pulumi-command = "*"
 pylint = "*"
 flake8 = "*"
 black = "*"
+pre-commit = "*"
 
 [requires]
 python_version = "3.10"
