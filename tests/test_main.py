@@ -1,4 +1,8 @@
 import unittest
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pulumi
 import pulumi_oci as oci
@@ -12,6 +16,7 @@ class TestMain(unittest.TestCase):
         self.ssh_key_path = self.config.require("ssh-key-path")
         self.ssh_public_key_path = self.config.require("ssh-public-key-path")
         self.compartment_id = self.config.require("compartment-id")
+        self.ssh_public_key = self.config.require("ssh-public-key")
 
     def tearDown(self):
         # Add cleanup actions here if any resources are created in setUp method
@@ -36,6 +41,7 @@ class TestMain(unittest.TestCase):
 
     def test_subnet_creation(self):
         vcn = main.create_vcn(self.compartment_id)
+        internet_gateway = main.create_internet_gateway(self.compartment_id, vcn.id)
         route_table = main.create_route_table(self.compartment_id, vcn.default_route_table_id, internet_gateway.id)
         subnet = main.create_subnet(self.compartment_id, vcn.id, route_table.id)
         self.assertIsInstance(subnet, oci.core.Subnet)
@@ -47,6 +53,7 @@ class TestMain(unittest.TestCase):
 
     def test_instance_creation(self):
         vcn = main.create_vcn(self.compartment_id)
+        internet_gateway = main.create_internet_gateway(self.compartment_id, vcn.id)
         route_table = main.create_route_table(self.compartment_id, vcn.default_route_table_id, internet_gateway.id)
         subnet = main.create_subnet(self.compartment_id, vcn.id, route_table.id)
         security_group = main.create_security_group(self.compartment_id, vcn.id)
@@ -55,6 +62,7 @@ class TestMain(unittest.TestCase):
 
     def test_rke_cluster_creation(self):
         vcn = main.create_vcn(self.compartment_id)
+        internet_gateway = main.create_internet_gateway(self.compartment_id, vcn.id)
         route_table = main.create_route_table(self.compartment_id, vcn.default_route_table_id, internet_gateway.id)
         subnet = main.create_subnet(self.compartment_id, vcn.id, route_table.id)
         security_group = main.create_security_group(self.compartment_id, vcn.id)
