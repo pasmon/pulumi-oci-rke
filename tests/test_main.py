@@ -1,23 +1,43 @@
+import base64
 import unittest
 from unittest import mock
-import base64
-import __main__ as main
-import pulumi_oci as oci
+
 import pulumi
+import pulumi_oci as oci
+
+import __main__ as main
+
 
 class TestMain(unittest.TestCase):
     """Unit tests for the __main__.py file."""
+
     def setUp(self):
         """Set up variables for the tests."""
         self.ssh_key_data = "ssh-key-data"
         self.ssh_public_key = "ssh-public-key"
         self.user_data = main.USER_DATA
-        self.user_data_base64 = base64.b64encode(self.user_data.encode("utf-8")).decode("utf-8")
+        self.user_data_base64 = base64.b64encode(
+            self.user_data.encode("utf-8")
+        ).decode("utf-8")
         self.compartment_id = "compartment-id"
-        self.vcn = oci.core.Vcn("oci-vcn", self.compartment_id, ["10.0.0.0/16"])
-        self.route_table = oci.core.DefaultRouteTable("oci-routetable", self.compartment_id, self.vcn.default_route_table_id)
-        self.security_group = oci.core.NetworkSecurityGroup("oci-securitygroup", self.compartment_id, self.vcn.id)
-        self.subnet = oci.core.Subnet("oci-subnet", "10.0.0.0/24", self.compartment_id, self.vcn.id, self.route_table.id)
+        self.vcn = oci.core.Vcn(
+            "oci-vcn", self.compartment_id, ["10.0.0.0/16"]
+        )
+        self.route_table = oci.core.DefaultRouteTable(
+            "oci-routetable",
+            self.compartment_id,
+            self.vcn.default_route_table_id,
+        )
+        self.security_group = oci.core.NetworkSecurityGroup(
+            "oci-securitygroup", self.compartment_id, self.vcn.id
+        )
+        self.subnet = oci.core.Subnet(
+            "oci-subnet",
+            "10.0.0.0/24",
+            self.compartment_id,
+            self.vcn.id,
+            self.route_table.id,
+        )
 
     @mock.patch('builtins.open', new_callable=mock.mock_open, read_data="ssh-key-data")
     def test_read_ssh_keys(self, mock_open):
@@ -33,7 +53,9 @@ class TestMain(unittest.TestCase):
     def test_write_kubeconfig(self, mock_open):
         kubeconfig_data = "kubeconfig-data"
         main.write_kubeconfig(kubeconfig_data)
-        mock_open.assert_called_once_with("out/rke_kubeconfig", "w", encoding="utf8")
+        mock_open.assert_called_once_with(
+            "out/rke_kubeconfig", "w", encoding="utf8"
+        )
         mock_open().write.assert_called_once_with(kubeconfig_data)
 
     @mock.patch('pulumi_oci.core.Vcn', return_value=self.vcn)
@@ -45,7 +67,18 @@ class TestMain(unittest.TestCase):
     @mock.patch('pulumi_oci.core.Instance')
     @mock.patch('pulumi_command.remote.Command')
     @mock.patch('pulumi_rke.Cluster')
-    def test_main(self, mock_cluster, mock_command, mock_instance, mock_security_rule, mock_security_group, mock_subnet, mock_route_table, mock_internet_gateway, mock_vcn):
+    def test_main(
+        self,
+        mock_cluster,
+        mock_command,
+        mock_instance,
+        mock_security_rule,
+        mock_security_group,
+        mock_subnet,
+        mock_route_table,
+        mock_internet_gateway,
+        mock_vcn,
+    ):
         main.main()
         mock_subnet.assert_called_once_with(
             "oci-subnet",
@@ -105,20 +138,9 @@ class TestMain(unittest.TestCase):
         """Clean up after each test."""
         pass
 
+
 if __name__ == "__main__":
     unittest.main()
-                shape_config=oci.core.InstanceShapeConfigArgs(
-                    memory_in_gbs=12,
-                    ocpus=2,
-                ),
-                metadata={
-                    "ssh_authorized_keys": self.ssh_public_key,
-                    "user_data": self.user_data_base64,
-                },
-                opts=pulumi.ResourceOptions(delete_before_replace=True),
-            )
-            assert mock_command.call_count == 2
-            assert mock_cluster.call_count == 1
     
         def tearDown(self):
             """Clean up after each test."""
