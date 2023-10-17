@@ -20,11 +20,14 @@ with open(ssh_public_key_path, "r", encoding="utf-8") as ssh_public_file:
     ssh_public_key = ssh_public_file.read()
 
 # install docker and do modifications for rke installation
+REMOVE_PACKAGES = "ufw docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc"
+INSTALL_PACKAGES = "docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+VERSION_STRING = "5:20.10.24~3-0~ubuntu-jammy"
+
 USER_DATA = """#!/bin/bash -x
 sudo iptables -F
 sudo netfilter-persistent save
-for pkg in ufw docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; \
-    do sudo apt-get remove -y $pkg; done
+for pkg in $REMOVE_PACKAGES; do sudo apt-get remove -y $pkg; done
 # Add Docker's official GPG key:
 sudo apt-get update
 sudo apt-get install ca-certificates curl gnupg
@@ -38,9 +41,7 @@ echo \
   "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt-get update
-VERSION_STRING=5:20.10.24~3-0~ubuntu-jammy
-sudo apt-get install -y docker-ce=$VERSION_STRING docker-ce-cli=$VERSION_STRING \
-    containerd.io docker-buildx-plugin docker-compose-plugin
+for pkg in $INSTALL_PACKAGES; do sudo apt-get install -y $pkg=$VERSION_STRING; done
 sudo groupadd docker
 sudo usermod -aG docker ubuntu
 sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
@@ -50,7 +51,6 @@ echo 'AllowTcpForwarding yes' | sudo tee -a /etc/ssh/sshd_config
 encodedBytes = base64.b64encode(USER_DATA.encode("utf-8"))
 USER_DATA_BASE64 = str(encodedBytes, "utf-8")
 
-# TODO: lookup compartment_id
 vcn = oci.core.Vcn(
     "oci-vcn",
     compartment_id=compartment_id,
@@ -203,7 +203,6 @@ vm2 = oci.core.Instance(
     opts=pulumi.ResourceOptions(delete_before_replace=True),
 )
 
-# TODO: parametrize user
 # let's wait for VMs to run their cloud init to completion
 vm1_ready = remote.Command(
     "vm1-ready",
