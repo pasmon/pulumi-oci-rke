@@ -1,10 +1,3 @@
-import unittest
-import pulumi
-from pulumi_command import remote
-import pulumi_oci as oci
-import pulumi_rke as rke
-import __main__ as main
-
 class TestMain(unittest.TestCase):
     def setUp(self):
         self.config = pulumi.Config()
@@ -13,6 +6,7 @@ class TestMain(unittest.TestCase):
         self.compartment_id = self.config.require("compartment-id")
 
     def tearDown(self):
+        # Add cleanup actions here if any resources are created in setUp method
         pass
 
     def test_vcn_creation(self):
