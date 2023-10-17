@@ -253,7 +253,7 @@ rke_cluster = rke.Cluster(
         ),
     ],
     services_kube_proxy_deprecated=rke.ClusterServicesKubeProxyDeprecatedArgs(
-        extra_args={"healthz-bind-address": "0.0.0.0"}
+        extra_args={"healthz-bind-address": "127.0.0.1"}
     ),
     cluster_name="masterofclusters",
     ssh_agent_auth=False,
