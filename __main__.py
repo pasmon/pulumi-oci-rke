@@ -1,12 +1,18 @@
 """Pulumi program to deploy RKE cluster to 2 free tier nodes on Oracle Cloud."""
 
-import os
 import base64
+import os
 
-import pulumi
-from pulumi_command import remote
-import pulumi_oci as oci
-import pulumi_rke as rke
+try:
+    import pulumi
+    import pulumi_oci as oci
+    import pulumi_rke as rke
+    from pulumi_command import remote
+except ImportError as e:
+    print(
+        f"Error importing module: {e}. Please ensure the required packages are installed."
+    )
+    raise
 
 config = pulumi.Config()
 ssh_key_path = config.require("ssh-key-path")
@@ -21,7 +27,9 @@ with open(ssh_public_key_path, "r", encoding="utf-8") as ssh_public_file:
 
 # install docker and do modifications for rke installation
 REMOVE_PACKAGES = "ufw docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc"
-INSTALL_PACKAGES = "docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+INSTALL_PACKAGES = (
+    "docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
+)
 VERSION_STRING = "5:20.10.24~3-0~ubuntu-jammy"
 
 USER_DATA = """#!/bin/bash -x
