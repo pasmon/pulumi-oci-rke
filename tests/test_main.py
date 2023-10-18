@@ -62,10 +62,10 @@ class TestMain(unittest.TestCase):
         )
         mock_open().write.assert_called_once_with(kubeconfig_data)
 
-    @mock.patch('pulumi_oci.core.Vcn', return_value=self.vcn)
-    @mock.patch('pulumi_oci.core.DefaultRouteTable', return_value=self.route_table)
-    @mock.patch('pulumi_oci.core.Subnet', return_value=self.subnet)
-    @mock.patch('pulumi_oci.core.NetworkSecurityGroup', return_value=self.security_group)
+    @mock.patch('pulumi_oci.core.Vcn')
+    @mock.patch('pulumi_oci.core.DefaultRouteTable')
+    @mock.patch('pulumi_oci.core.Subnet')
+    @mock.patch('pulumi_oci.core.NetworkSecurityGroup')
     @mock.patch('pulumi_oci.core.NetworkSecurityGroupSecurityRule')
     @mock.patch('pulumi_oci.core.Instance')
     @mock.patch('pulumi_command.remote.Command')
@@ -79,6 +79,10 @@ class TestMain(unittest.TestCase):
         mock_security_group,
         mock_subnet,
     ):
+        main.Vcn.return_value = self.vcn
+        main.DefaultRouteTable.return_value = self.route_table
+        main.Subnet.return_value = self.subnet
+        main.NetworkSecurityGroup.return_value = self.security_group
         main.main()
         mock_subnet.assert_called_once_with(
             "oci-subnet",
