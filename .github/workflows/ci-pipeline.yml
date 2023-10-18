@@ -19,7 +19,4 @@ jobs:
           cache: 'pipenv'
       - name: Install dependencies
         run: pipenv install --dev
-      - name: Run flake8
-        run: pipenv run flake8 *.py
-      - name: Run pylint
-        run: pipenv run pylint *.py
+      - uses: chartboost/ruff-action@v1
