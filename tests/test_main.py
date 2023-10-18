@@ -63,7 +63,6 @@ class TestMain(unittest.TestCase):
         mock_open().write.assert_called_once_with(kubeconfig_data)
 
     @mock.patch('pulumi_oci.core.Vcn', return_value=self.vcn)
-    @mock.patch('pulumi_oci.core.InternetGateway')
     @mock.patch('pulumi_oci.core.DefaultRouteTable', return_value=self.route_table)
     @mock.patch('pulumi_oci.core.Subnet', return_value=self.subnet)
     @mock.patch('pulumi_oci.core.NetworkSecurityGroup', return_value=self.security_group)
@@ -79,9 +78,6 @@ class TestMain(unittest.TestCase):
         mock_security_rule,
         mock_security_group,
         mock_subnet,
-        mock_route_table,
-        mock_internet_gateway,
-        mock_vcn,
     ):
         main.main()
         mock_subnet.assert_called_once_with(
