@@ -1,3 +1,7 @@
+"""
+This module contains unit tests for the __main__.py file.
+"""
+
 import base64
 import unittest
 from unittest import mock
@@ -131,12 +135,11 @@ class TestMain(unittest.TestCase):
             },
             opts=pulumi.ResourceOptions(delete_before_replace=True),
         )
-        assert mock_command.call_count == 2
-        assert mock_cluster.call_count == 1
+        self.assertEqual(mock_command.call_count, 2)
+        self.assertEqual(mock_cluster.call_count, 1)
 
     def tearDown(self):
         """Clean up after each test."""
-        pass
 
 if __name__ == "__main__":
     unittest.main()
