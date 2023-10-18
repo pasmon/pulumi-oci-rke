@@ -138,20 +138,5 @@ class TestMain(unittest.TestCase):
         """Clean up after each test."""
         pass
 
-
-if __name__ == "__main__":
-    unittest.main()
-    
-        def tearDown(self):
-            """Clean up after each test."""
-            pass
-    
-    if __name__ == "__main__":
-        unittest.main()
-
-        def tearDown(self):
-            """Clean up after each test."""
-            pass
-
 if __name__ == "__main__":
     unittest.main()
