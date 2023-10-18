@@ -62,26 +62,39 @@ class TestMain(unittest.TestCase):
         )
         mock_open().write.assert_called_once_with(kubeconfig_data)
 
-    @mock.patch('pulumi_oci.core.Vcn', return_value=self.vcn)
-    @mock.patch('pulumi_oci.core.DefaultRouteTable', return_value=self.route_table)
-    @mock.patch('pulumi_oci.core.Subnet', return_value=self.subnet)
-    @mock.patch('pulumi_oci.core.NetworkSecurityGroup', return_value=self.security_group)
+    @mock.patch('pulumi_oci.core.Vcn')
+    @mock.patch('pulumi_oci.core.DefaultRouteTable')
+    @mock.patch('pulumi_oci.core.Subnet')
+    @mock.patch('pulumi_oci.core.NetworkSecurityGroup')
     @mock.patch('pulumi_oci.core.NetworkSecurityGroupSecurityRule')
     @mock.patch('pulumi_oci.core.Instance')
     @mock.patch('pulumi_command.remote.Command')
     @mock.patch('pulumi_rke.Cluster')
     def test_main(
         self,
-        *args
+        mock_cluster,
+        mock_command,
+        mock_instance,
+        mock_security_rule,
+        mock_security_group,
+        mock_subnet,
+        mock_route_table,
+        mock_vcn
     ):
         mocks = {
-            'mock_cluster': args[0],
-            'mock_command': args[1],
-            'mock_instance': args[2],
-            'mock_security_rule': args[3],
-            'mock_security_group': args[4],
-            'mock_subnet': args[5],
+            'mock_cluster': mock_cluster,
+            'mock_command': mock_command,
+            'mock_instance': mock_instance,
+            'mock_security_rule': mock_security_rule,
+            'mock_security_group': mock_security_group,
+            'mock_subnet': mock_subnet,
+            'mock_route_table': mock_route_table,
+            'mock_vcn': mock_vcn
         }
+        mocks['mock_vcn'].return_value = self.vcn
+        mocks['mock_route_table'].return_value = self.route_table
+        mocks['mock_subnet'].return_value = self.subnet
+        mocks['mock_security_group'].return_value = self.security_group
         main.main()
         mocks['mock_subnet'].assert_called_once_with(
             "oci-subnet",
