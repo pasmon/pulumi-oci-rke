@@ -45,16 +45,19 @@ class TestMain(unittest.TestCase):
 
     @mock.patch('builtins.open', new_callable=mock.mock_open, read_data="ssh-key-data")
     def test_read_ssh_keys(self, mock_open):
+        """Test the read_ssh_keys function."""
         with mock.patch('os.path.exists', return_value=True):
             ssh_key_data = main.read_ssh_key("ssh-key-path")
             self.assertEqual(ssh_key_data, self.ssh_key_data)
 
     def test_encode_user_data(self):
+        """Test the encode_user_data function."""
         encoded_user_data = main.encode_user_data(self.user_data)
         self.assertEqual(encoded_user_data, self.user_data_base64)
 
     @mock.patch('builtins.open', new_callable=mock.mock_open)
     def test_write_kubeconfig(self, mock_open):
+        """Test the write_kubeconfig function."""
         kubeconfig_data = "kubeconfig-data"
         main.write_kubeconfig(kubeconfig_data)
         mock_open.assert_called_once_with(
@@ -62,10 +65,10 @@ class TestMain(unittest.TestCase):
         )
         mock_open().write.assert_called_once_with(kubeconfig_data)
 
-    @mock.patch('pulumi_oci.core.Vcn')
-    @mock.patch('pulumi_oci.core.DefaultRouteTable')
-    @mock.patch('pulumi_oci.core.Subnet')
-    @mock.patch('pulumi_oci.core.NetworkSecurityGroup')
+    @mock.patch('pulumi_oci.core.Vcn', return_value=self.vcn)
+    @mock.patch('pulumi_oci.core.DefaultRouteTable', return_value=self.route_table)
+    @mock.patch('pulumi_oci.core.Subnet', return_value=self.subnet)
+    @mock.patch('pulumi_oci.core.NetworkSecurityGroup', return_value=self.security_group)
     @mock.patch('pulumi_oci.core.NetworkSecurityGroupSecurityRule')
     @mock.patch('pulumi_oci.core.Instance')
     @mock.patch('pulumi_command.remote.Command')
@@ -81,6 +84,7 @@ class TestMain(unittest.TestCase):
         mock_route_table,
         mock_vcn
     ):
+        """Test the main function."""
         mocks = {
             'mock_cluster': mock_cluster,
             'mock_command': mock_command,
@@ -91,10 +95,6 @@ class TestMain(unittest.TestCase):
             'mock_route_table': mock_route_table,
             'mock_vcn': mock_vcn
         }
-        mocks['mock_vcn'].return_value = self.vcn
-        mocks['mock_route_table'].return_value = self.route_table
-        mocks['mock_subnet'].return_value = self.subnet
-        mocks['mock_security_group'].return_value = self.security_group
         main.main()
         mocks['mock_subnet'].assert_called_once_with(
             "oci-subnet",
