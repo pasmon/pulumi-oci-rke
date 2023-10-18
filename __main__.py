@@ -21,7 +21,10 @@ with open(ssh_public_key_path, "r", encoding="utf-8") as ssh_public_file:
 
 # install docker and do modifications for rke installation
 PACKAGES_TO_REMOVE = "ufw docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc"
-PACKAGES_TO_INSTALL = "docker-ce=$VERSION_STRING docker-ce-cli=$VERSION_STRING containerd.io docker-buildx-plugin docker-compose-plugin"
+PACKAGES_TO_INSTALL = (
+    "docker-ce=$VERSION_STRING docker-ce-cli=$VERSION_STRING containerd.io docker-buildx-plugin "
+    "docker-compose-plugin"
+)
 
 USER_DATA = f"""#!/bin/bash -x
 sudo iptables -F
