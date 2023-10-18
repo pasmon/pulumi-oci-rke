@@ -20,27 +20,32 @@ with open(ssh_public_key_path, "r", encoding="utf-8") as ssh_public_file:
     ssh_public_key = ssh_public_file.read()
 
 # install docker and do modifications for rke installation
-USER_DATA = """#!/bin/bash -x
+PACKAGES_TO_REMOVE = "ufw docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc"
+PACKAGES_TO_INSTALL = (
+    "docker-ce=$VERSION_STRING docker-ce-cli=$VERSION_STRING containerd.io docker-buildx-plugin "
+    "docker-compose-plugin"
+)
+
+USER_DATA = f"""#!/bin/bash -x
 sudo iptables -F
 sudo netfilter-persistent save
-for pkg in ufw docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; \
-    do sudo apt-get remove -y $pkg; done
+for pkg in {PACKAGES_TO_REMOVE}; do sudo apt-get remove -y $pkg; done
 # Add Docker's official GPG key:
 sudo apt-get update
-sudo apt-get install ca-certificates curl gnupg
+sudo apt-get install -y ca-certificates curl gnupg
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
 # Add the repository to Apt sources:
 echo \
-  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/ubuntu \
-  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+  "deb [arch="$(dpkg --print-architecture)" \
+  signed-by=/etc/apt/keyrings/docker.gpg] \
+    https://download.docker.com/linux/ubuntu" \
+    "$(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt-get update
 VERSION_STRING=5:20.10.24~3-0~ubuntu-jammy
-sudo apt-get install -y docker-ce=$VERSION_STRING docker-ce-cli=$VERSION_STRING \
-    containerd.io docker-buildx-plugin docker-compose-plugin
+for pkg in {PACKAGES_TO_INSTALL}; do sudo apt-get install -y --allow-downgrades $pkg; done
 sudo groupadd docker
 sudo usermod -aG docker ubuntu
 sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
@@ -153,57 +158,62 @@ security_group_security_rule4 = oci.core.NetworkSecurityGroupSecurityRule(
     ),
 )
 
-vm1 = oci.core.Instance(
-    "oci-master",
-    display_name="k8s-master",
-    availability_domain="Dtqv:EU-STOCKHOLM-1-AD-1",
-    compartment_id=compartment_id,
-    shape="VM.Standard.A1.Flex",
-    create_vnic_details=oci.core.InstanceCreateVnicDetailsArgs(
-        subnet_id=subnet.id,
-        nsg_ids=[security_group.id],
-    ),
-    source_details=oci.core.InstanceSourceDetailsArgs(
-        source_id="ocid1.image.oc1.eu-stockholm-1.aaaaaaaabn32f7fcafa3mf3jim2yjlak4zbk6cqwpyolhspg2miozqephuha",
-        source_type="image",
-    ),
-    shape_config=oci.core.InstanceShapeConfigArgs(
-        memory_in_gbs=12,
-        ocpus=2,
-    ),
-    metadata={
-        "ssh_authorized_keys": ssh_public_key,
-        "user_data": USER_DATA_BASE64,
-    },
-    opts=pulumi.ResourceOptions(delete_before_replace=True),
-)
 
-vm2 = oci.core.Instance(
-    "oci-worker",
-    display_name="k8s-worker",
-    availability_domain="Dtqv:EU-STOCKHOLM-1-AD-1",
-    compartment_id=compartment_id,
-    shape="VM.Standard.A1.Flex",
-    create_vnic_details=oci.core.InstanceCreateVnicDetailsArgs(
-        subnet_id=subnet.id,
-        nsg_ids=[security_group.id],
-    ),
-    source_details=oci.core.InstanceSourceDetailsArgs(
-        source_id="ocid1.image.oc1.eu-stockholm-1.aaaaaaaabn32f7fcafa3mf3jim2yjlak4zbk6cqwpyolhspg2miozqephuha",
-        source_type="image",
-    ),
-    shape_config=oci.core.InstanceShapeConfigArgs(
-        memory_in_gbs=12,
-        ocpus=2,
-    ),
-    metadata={
-        "ssh_authorized_keys": ssh_public_key,
-        "user_data": USER_DATA_BASE64,
-    },
-    opts=pulumi.ResourceOptions(delete_before_replace=True),
-)
+def create_instance(instance_config):
+    """
+    Create an instance in Oracle Cloud Infrastructure (OCI).
 
-# TODO: parametrize user
+    Args:
+        instance_config (dict): A dictionary containing the configuration for the instance.
+
+    Returns:
+        oci.core.Instance: The created instance.
+    """
+    return oci.core.Instance(
+        instance_config["name"],
+        display_name=instance_config["display_name"],
+        availability_domain="Dtqv:EU-STOCKHOLM-1-AD-1",
+        compartment_id=compartment_id,
+        shape="VM.Standard.A1.Flex",
+        create_vnic_details=oci.core.InstanceCreateVnicDetailsArgs(
+            subnet_id=instance_config["subnet_id"],
+            nsg_ids=[instance_config["security_group_id"]],
+        ),
+        source_details=oci.core.InstanceSourceDetailsArgs(
+            source_id="ocid1.image.oc1.eu-stockholm-1.aaaaaaaabn32f7fcafa3mf3jim2yjlak4zbk6cqwpyolhspg2miozqephuha",
+            source_type="image",
+        ),
+        shape_config=oci.core.InstanceShapeConfigArgs(
+            memory_in_gbs=12,
+            ocpus=2,
+        ),
+        metadata={
+            "ssh_authorized_keys": instance_config["ssh_public_key"],
+            "user_data": instance_config["user_data_base64"],
+        },
+        opts=pulumi.ResourceOptions(delete_before_replace=True),
+    )
+
+
+vm1_config = {
+    "name": "oci-master",
+    "display_name": "k8s-master",
+    "subnet_id": subnet.id,
+    "security_group_id": security_group.id,
+    "ssh_public_key": ssh_public_key,
+    "user_data_base64": USER_DATA_BASE64,
+}
+vm1 = create_instance(vm1_config)
+
+vm2_config = {
+    "name": "oci-worker",
+    "display_name": "k8s-worker",
+    "subnet_id": subnet.id,
+    "security_group_id": security_group.id,
+    "ssh_public_key": ssh_public_key,
+    "user_data_base64": USER_DATA_BASE64,
+}
+vm2 = create_instance(vm2_config)
 # let's wait for VMs to run their cloud init to completion
 vm1_ready = remote.Command(
     "vm1-ready",
@@ -254,7 +264,7 @@ rke_cluster = rke.Cluster(
         ),
     ],
     services_kube_proxy_deprecated=rke.ClusterServicesKubeProxyDeprecatedArgs(
-        extra_args={"healthz-bind-address": "0.0.0.0"}
+        extra_args={"healthz-bind-address": "127.0.0.1"}
     ),
     cluster_name="masterofclusters",
     ssh_agent_auth=False,
@@ -266,4 +276,6 @@ rke_cluster = rke.Cluster(
 rke_cluster.kube_config_yaml.apply(lambda a: write_kubeconfig(data=a))
 
 pulumi.export("images", rke_cluster.running_system_images)
+pulumi.export("master_pip", vm1.public_ip)
+pulumi.export("worker_pip", vm2.public_ip)
 pulumi.export("state", rke_cluster.rke_state)
