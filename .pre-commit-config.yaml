@@ -10,9 +10,13 @@ repos:
   rev: v0.1.0
   hooks:
     - id: ruff
--   repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v2.4.0
+- repo: https://github.com/compilerla/conventional-pre-commit
+  rev: v2.4.0
+  hooks:
+    - id: conventional-pre-commit
+      stages: [commit-msg]
+      args: [] # optional: list of Conventional Commits types to allow e.g. [feat, fix, ci, chore, test]
+-   repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
     hooks:
-      - id: conventional-pre-commit
-        stages: [commit-msg]
-        args: [] # optional: list of Conventional Commits types to allow e.g. [feat, fix, ci, chore, test
+    - id: bandit
