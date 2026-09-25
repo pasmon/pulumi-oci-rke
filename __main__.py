@@ -310,7 +310,8 @@ def build_argocd_repository_secret_string_data(
         or github_app_private_key is None
     ):
         raise ValueError(
-            "Set argocd-github-app-id, argocd-github-app-installation-id, and argocd-github-app-private-key together, or omit them all."
+            "Set argocd-github-app-id, argocd-github-app-installation-id, "
+            "and argocd-github-app-private-key together, or omit them all."
         )
     if repo_ssh_private_key is not None:
         return {
