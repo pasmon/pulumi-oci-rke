@@ -1,12 +1,12 @@
 """Pulumi program to deploy RKE cluster to 2 free tier nodes on Oracle Cloud."""
 
-import os
 import base64
+import os
 
 import pulumi
-from pulumi_command import remote
 import pulumi_oci as oci
 import pulumi_rke as rke
+from pulumi_command import remote
 
 config = pulumi.Config()
 ssh_key_path = config.require("ssh-key-path")

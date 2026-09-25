@@ -1,0 +1,45 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Lint, Syntax Check & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pipenv
+        run: pipx install pipenv
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: "pipenv"
+
+      - name: Install dependencies
+        run: pipenv install --dev
+
+      - name: Syntax check
+        run: pipenv run python -m py_compile __main__.py tests/*.py
+
+      - name: Lint with Ruff
+        run: pipenv run ruff check .
+
+      - name: Format check with Black
+        run: pipenv run black --check .
+
+      - name: Lint with Pylint
+        run: pipenv run pylint __main__.py tests
+
+      - name: Security check with Bandit
+        run: pipenv run bandit -c pyproject.toml -r . -x ./tests
+
+      - name: Run Unit Tests
+        run: pipenv run pytest -v
