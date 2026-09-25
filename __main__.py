@@ -267,15 +267,25 @@ def write_kubeconfig(data, server_address):
 
 def rewrite_kubeconfig_server(data, server_address):
     """Rewrite the loopback API endpoint in the kubeconfig."""
+    if data is None or server_address is None:
+        return data
     return data.replace("127.0.0.1", server_address)
 
 
-def build_argocd_repository_secret_string_data(repo_url, repo_username=None, repo_password=None, repo_ssh_private_key=None):
+def build_argocd_repository_secret_string_data(
+    repo_url, repo_username=None, repo_password=None, repo_ssh_private_key=None
+):
     """Build the optional Argo CD repository secret payload."""
-    if repo_ssh_private_key is not None and (repo_username is not None or repo_password is not None):
-        raise ValueError("Use either HTTPS credentials or an SSH private key for Argo CD repository access, not both.")
+    if repo_ssh_private_key is not None and (
+        repo_username is not None or repo_password is not None
+    ):
+        raise ValueError(
+            "Use either HTTPS credentials or an SSH private key for Argo CD repository access, not both."
+        )
     if (repo_username is None) != (repo_password is None):
-        raise ValueError("Set both argocd-repo-username and argocd-repo-password, or neither.")
+        raise ValueError(
+            "Set both argocd-repo-username and argocd-repo-password, or neither."
+        )
     if repo_ssh_private_key is not None:
         return {
             "type": "git",
@@ -392,7 +402,9 @@ argocd_release = k8s.helm.v3.Release(
         "crds": {"install": True},
         "server": {"service": {"type": "ClusterIP"}},
     },
-    opts=pulumi.ResourceOptions(provider=argocd_provider, depends_on=[argocd_namespace]),
+    opts=pulumi.ResourceOptions(
+        provider=argocd_provider, depends_on=[argocd_namespace]
+    ),
 )
 
 argocd_bootstrap_repo_secret_string_data = build_argocd_repository_secret_string_data(
@@ -415,7 +427,9 @@ if argocd_bootstrap_repo_secret_string_data is not None:
         },
         string_data=argocd_bootstrap_repo_secret_string_data,
         type="Opaque",
-        opts=pulumi.ResourceOptions(provider=argocd_provider, depends_on=[argocd_namespace]),
+        opts=pulumi.ResourceOptions(
+            provider=argocd_provider, depends_on=[argocd_namespace]
+        ),
     )
 
 argocd_root_application_dependencies = [argocd_release]
@@ -446,7 +460,9 @@ argocd_root_application = k8s.apiextensions.CustomResource(
             "syncOptions": ["CreateNamespace=true"],
         },
     },
-    opts=pulumi.ResourceOptions(provider=argocd_provider, depends_on=argocd_root_application_dependencies),
+    opts=pulumi.ResourceOptions(
+        provider=argocd_provider, depends_on=argocd_root_application_dependencies
+    ),
 )
 
 pulumi.export("master_pip", vm1.public_ip)

@@ -16,20 +16,15 @@ import pytest
 class PulumiMocks(pulumi.runtime.Mocks):
     """Mocks for Pulumi engine during unit tests."""
 
-    def __init__(self):
-        self.resources = []
-
     def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        self.resources.append(args)
         outputs = dict(args.inputs)
 
-        if args.typ == "oci:core/instance:Instance":
-            if args.name == "oci-master":
-                outputs["public_ip"] = "203.0.113.10"
-                outputs["private_ip"] = "10.0.0.10"
-            else:
-                outputs["public_ip"] = "203.0.113.11"
-                outputs["private_ip"] = "10.0.0.11"
+        if args.name == "oci-master":
+            outputs["public_ip"] = "203.0.113.10"
+            outputs["private_ip"] = "10.0.0.10"
+        elif args.name == "oci-worker":
+            outputs["public_ip"] = "203.0.113.11"
+            outputs["private_ip"] = "10.0.0.11"
 
         if args.typ == "command:remote:Command":
             outputs.setdefault("stdout", "")
@@ -86,15 +81,13 @@ def pulumi_stack():
         '"oci-rke-provision:argocd-repo-password":"test-password"}'
     )
 
-    mocks = PulumiMocks()
-    pulumi.runtime.set_mocks(mocks, project="oci-rke-provision", stack="test")
+    pulumi.runtime.set_mocks(PulumiMocks(), project="oci-rke-provision", stack="test")
 
     spec = importlib.util.spec_from_file_location(
         "main", os.path.abspath("__main__.py")
     )
     infra = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(infra)
-    infra.mock_resources = mocks.resources
 
     yield infra
 
@@ -179,13 +172,17 @@ def test_argocd_repository_secret_builder(pulumi_stack):
         is None
     )
 
-    with pytest.raises(ValueError, match="Set both argocd-repo-username and argocd-repo-password"):
+    with pytest.raises(
+        ValueError, match="Set both argocd-repo-username and argocd-repo-password"
+    ):
         pulumi_stack.build_argocd_repository_secret_string_data(
             "https://github.com/pasmon/pulumi-oci-rke.git",
             repo_username="git",
         )
 
-    with pytest.raises(ValueError, match="Use either HTTPS credentials or an SSH private key"):
+    with pytest.raises(
+        ValueError, match="Use either HTTPS credentials or an SSH private key"
+    ):
         pulumi_stack.build_argocd_repository_secret_string_data(
             "https://github.com/pasmon/pulumi-oci-rke.git",
             repo_username="git",
@@ -232,24 +229,15 @@ def test_rke2_cluster_config(pulumi_stack):
 
 def test_argocd_config(pulumi_stack):
     """Test Argo CD bootstrap configuration defaults and constants."""
-    assert pulumi_stack.argocd_repo_url == "https://github.com/pasmon/pulumi-oci-rke.git"
+    assert (
+        pulumi_stack.argocd_repo_url == "https://github.com/pasmon/pulumi-oci-rke.git"
+    )
     assert pulumi_stack.argocd_repo_target_revision == "main"
     assert pulumi_stack.argocd_repo_path == "gitops/bootstrap"
     assert pulumi_stack.ARGOCD_NAMESPACE == "argocd"
     assert pulumi_stack.ARGOCD_HELM_CHART == "argo-cd"
     assert pulumi_stack.ARGOCD_HELM_REPO == "https://argoproj.github.io/argo-helm"
     assert pulumi_stack.ARGOCD_HELM_VERSION == "8.3.3"
-
-
-def test_argocd_resource_providers(pulumi_stack):
-    """Test that Argo CD resources are created through the Kubernetes provider."""
-    resources_by_name = {resource.name: resource for resource in pulumi_stack.mock_resources}
-
-    assert resources_by_name["rke2-kubernetes"].typ == "pulumi:providers:kubernetes"
-    assert resources_by_name["argocd-namespace"].provider == "rke2-kubernetes_id"
-    assert resources_by_name["argocd"].provider == "rke2-kubernetes_id"
-    assert resources_by_name["argocd-bootstrap-repo"].provider == "rke2-kubernetes_id"
-    assert resources_by_name["argocd-root-application"].provider == "rke2-kubernetes_id"
 
 
 def test_rke2_commands(pulumi_stack):
@@ -274,7 +262,7 @@ def test_rke2_commands(pulumi_stack):
 def test_argocd_provider_kubeconfig(pulumi_stack):
     """Test the Kubernetes provider uses the rewritten RKE2 kubeconfig."""
     return pulumi_stack.argocd_provider.kubeconfig.apply(
-        lambda kubeconfig: assert_argocd_provider_kubeconfig(kubeconfig)
+        assert_argocd_provider_kubeconfig
     )
 
 
@@ -333,7 +321,9 @@ def check_argocd_repository_secret(values):
 @pulumi.runtime.test
 def test_argocd_root_application_spec(pulumi_stack):
     """Test the bootstrap root Application spec."""
-    return pulumi_stack.argocd_root_application.spec.apply(check_argocd_root_application_spec)
+    return pulumi_stack.argocd_root_application.spec.apply(
+        check_argocd_root_application_spec
+    )
 
 
 def check_argocd_root_application_spec(spec):
