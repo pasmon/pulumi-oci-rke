@@ -280,11 +280,13 @@ def build_argocd_repository_secret_string_data(
     repo_username=None,
     repo_password=None,
     repo_ssh_private_key=None,
-    github_app_id=None,
-    github_app_installation_id=None,
-    github_app_private_key=None,
+    github_app_auth=None,
 ):
     """Build the optional Argo CD repository secret payload."""
+    github_app_auth = github_app_auth or {}
+    github_app_id = github_app_auth.get("id")
+    github_app_installation_id = github_app_auth.get("installation_id")
+    github_app_private_key = github_app_auth.get("private_key")
     has_https_auth = repo_username is not None or repo_password is not None
     has_ssh_auth = repo_ssh_private_key is not None
     has_github_app_auth = (
@@ -295,7 +297,8 @@ def build_argocd_repository_secret_string_data(
 
     if sum((has_https_auth, has_ssh_auth, has_github_app_auth)) > 1:
         raise ValueError(
-            "Use only one Argo CD repository authentication method: HTTPS credentials, an SSH private key, or GitHub App credentials."
+            "Use only one Argo CD repository authentication method: "
+            "HTTPS credentials, an SSH private key, or GitHub App credentials."
         )
     if has_https_auth and (repo_username is None or repo_password is None):
         raise ValueError(
@@ -443,9 +446,11 @@ argocd_bootstrap_repo_secret_string_data = build_argocd_repository_secret_string
     repo_username=argocd_repo_username,
     repo_password=argocd_repo_password,
     repo_ssh_private_key=argocd_repo_ssh_private_key,
-    github_app_id=argocd_github_app_id,
-    github_app_installation_id=argocd_github_app_installation_id,
-    github_app_private_key=argocd_github_app_private_key,
+    github_app_auth={
+        "id": argocd_github_app_id,
+        "installation_id": argocd_github_app_installation_id,
+        "private_key": argocd_github_app_private_key,
+    },
 )
 
 argocd_bootstrap_repo = None

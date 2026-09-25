@@ -167,9 +167,11 @@ def test_argocd_repository_secret_builder(pulumi_stack):
 
     github_app_secret = pulumi_stack.build_argocd_repository_secret_string_data(
         "https://github.com/pasmon/pulumi-oci-rke.git",
-        github_app_id="12345",
-        github_app_installation_id="67890",
-        github_app_private_key="PRIVATE KEY",
+        github_app_auth={
+            "id": "12345",
+            "installation_id": "67890",
+            "private_key": "PRIVATE KEY",
+        },
     )
     assert github_app_secret == {
         "type": "git",
@@ -210,8 +212,10 @@ def test_argocd_repository_secret_builder(pulumi_stack):
     ):
         pulumi_stack.build_argocd_repository_secret_string_data(
             "https://github.com/pasmon/pulumi-oci-rke.git",
-            github_app_id="12345",
-            github_app_private_key="PRIVATE KEY",
+            github_app_auth={
+                "id": "12345",
+                "private_key": "PRIVATE KEY",
+            },
         )
 
     with pytest.raises(
@@ -220,9 +224,11 @@ def test_argocd_repository_secret_builder(pulumi_stack):
         pulumi_stack.build_argocd_repository_secret_string_data(
             "https://github.com/pasmon/pulumi-oci-rke.git",
             repo_ssh_private_key="PRIVATE KEY",
-            github_app_id="12345",
-            github_app_installation_id="67890",
-            github_app_private_key="PRIVATE KEY",
+            github_app_auth={
+                "id": "12345",
+                "installation_id": "67890",
+                "private_key": "PRIVATE KEY",
+            },
         )
 
 
