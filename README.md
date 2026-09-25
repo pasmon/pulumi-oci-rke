@@ -70,6 +70,17 @@ replaced by this deployment rather than upgraded in place.
 
    `pulumi config set --secret argocd-repo-ssh-private-key @<path to SSH private key>`
 
+   Optional GitHub App credentials for a private GitHub repository:
+
+   `pulumi config set argocd-github-app-id <GitHub App ID>`
+
+   `pulumi config set argocd-github-app-installation-id <GitHub App installation ID>`
+
+   `pulumi config set --secret argocd-github-app-private-key @<path to GitHub App PEM private key>`
+
+   Configure only one authentication mode for Argo CD repository access:
+   HTTPS credentials, SSH private key, or GitHub App credentials.
+
 7. Launch 2 free tier ARM instances to Oracle Cloud and deploy RKE2 with Pulumi:
 
     `pulumi up`

@@ -21,6 +21,9 @@ argocd_repo_path = config.get("argocd-repo-path") or "gitops/bootstrap"
 argocd_repo_username = config.get("argocd-repo-username")
 argocd_repo_password = config.get_secret("argocd-repo-password")
 argocd_repo_ssh_private_key = config.get_secret("argocd-repo-ssh-private-key")
+argocd_github_app_id = config.get("argocd-github-app-id")
+argocd_github_app_installation_id = config.get("argocd-github-app-installation-id")
+argocd_github_app_private_key = config.get_secret("argocd-github-app-private-key")
 
 ARGOCD_NAMESPACE = "argocd"
 ARGOCD_HELM_REPO = "https://argoproj.github.io/argo-helm"
@@ -273,24 +276,52 @@ def rewrite_kubeconfig_server(data, server_address):
 
 
 def build_argocd_repository_secret_string_data(
-    repo_url, repo_username=None, repo_password=None, repo_ssh_private_key=None
+    repo_url,
+    repo_username=None,
+    repo_password=None,
+    repo_ssh_private_key=None,
+    github_app_id=None,
+    github_app_installation_id=None,
+    github_app_private_key=None,
 ):
     """Build the optional Argo CD repository secret payload."""
-    if repo_ssh_private_key is not None and (
-        repo_username is not None or repo_password is not None
-    ):
+    has_https_auth = repo_username is not None or repo_password is not None
+    has_ssh_auth = repo_ssh_private_key is not None
+    has_github_app_auth = (
+        github_app_id is not None
+        or github_app_installation_id is not None
+        or github_app_private_key is not None
+    )
+
+    if sum((has_https_auth, has_ssh_auth, has_github_app_auth)) > 1:
         raise ValueError(
-            "Use either HTTPS credentials or an SSH private key for Argo CD repository access, not both."
+            "Use only one Argo CD repository authentication method: HTTPS credentials, an SSH private key, or GitHub App credentials."
         )
-    if (repo_username is None) != (repo_password is None):
+    if has_https_auth and (repo_username is None or repo_password is None):
         raise ValueError(
             "Set both argocd-repo-username and argocd-repo-password, or neither."
+        )
+    if has_github_app_auth and (
+        github_app_id is None
+        or github_app_installation_id is None
+        or github_app_private_key is None
+    ):
+        raise ValueError(
+            "Set argocd-github-app-id, argocd-github-app-installation-id, and argocd-github-app-private-key together, or omit them all."
         )
     if repo_ssh_private_key is not None:
         return {
             "type": "git",
             "url": repo_url,
             "sshPrivateKey": repo_ssh_private_key,
+        }
+    if has_github_app_auth:
+        return {
+            "type": "git",
+            "url": repo_url,
+            "githubAppID": github_app_id,
+            "githubAppInstallationID": github_app_installation_id,
+            "githubAppPrivateKey": github_app_private_key,
         }
     if repo_username is not None and repo_password is not None:
         return {
@@ -412,6 +443,9 @@ argocd_bootstrap_repo_secret_string_data = build_argocd_repository_secret_string
     repo_username=argocd_repo_username,
     repo_password=argocd_repo_password,
     repo_ssh_private_key=argocd_repo_ssh_private_key,
+    github_app_id=argocd_github_app_id,
+    github_app_installation_id=argocd_github_app_installation_id,
+    github_app_private_key=argocd_github_app_private_key,
 )
 
 argocd_bootstrap_repo = None

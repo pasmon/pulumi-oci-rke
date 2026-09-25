@@ -165,6 +165,20 @@ def test_argocd_repository_secret_builder(pulumi_stack):
         "sshPrivateKey": "PRIVATE KEY",
     }
 
+    github_app_secret = pulumi_stack.build_argocd_repository_secret_string_data(
+        "https://github.com/pasmon/pulumi-oci-rke.git",
+        github_app_id="12345",
+        github_app_installation_id="67890",
+        github_app_private_key="PRIVATE KEY",
+    )
+    assert github_app_secret == {
+        "type": "git",
+        "url": "https://github.com/pasmon/pulumi-oci-rke.git",
+        "githubAppID": "12345",
+        "githubAppInstallationID": "67890",
+        "githubAppPrivateKey": "PRIVATE KEY",
+    }
+
     assert (
         pulumi_stack.build_argocd_repository_secret_string_data(
             "https://github.com/pasmon/pulumi-oci-rke.git"
@@ -181,13 +195,34 @@ def test_argocd_repository_secret_builder(pulumi_stack):
         )
 
     with pytest.raises(
-        ValueError, match="Use either HTTPS credentials or an SSH private key"
+        ValueError, match="Use only one Argo CD repository authentication method"
     ):
         pulumi_stack.build_argocd_repository_secret_string_data(
             "https://github.com/pasmon/pulumi-oci-rke.git",
             repo_username="git",
             repo_password="token",
             repo_ssh_private_key="PRIVATE KEY",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Set argocd-github-app-id, argocd-github-app-installation-id, and argocd-github-app-private-key together",
+    ):
+        pulumi_stack.build_argocd_repository_secret_string_data(
+            "https://github.com/pasmon/pulumi-oci-rke.git",
+            github_app_id="12345",
+            github_app_private_key="PRIVATE KEY",
+        )
+
+    with pytest.raises(
+        ValueError, match="Use only one Argo CD repository authentication method"
+    ):
+        pulumi_stack.build_argocd_repository_secret_string_data(
+            "https://github.com/pasmon/pulumi-oci-rke.git",
+            repo_ssh_private_key="PRIVATE KEY",
+            github_app_id="12345",
+            github_app_installation_id="67890",
+            github_app_private_key="PRIVATE KEY",
         )
 
 
