@@ -256,8 +256,9 @@ def server_command(token, server_address):
     return f"""set -eu
 curl -sfL https://get.rke2.io | sudo INSTALL_RKE2_VERSION={shlex.quote(rke2_version)} sh -
 sudo mkdir -p /etc/rancher/rke2
-printf 'token: %s\\nnode-name: master\\nwrite-kubeconfig-mode: "0644"\\ntls-san:\\n  - %s\\n' \
-    {shlex.quote(token)} {shlex.quote(server_address)} | sudo tee /etc/rancher/rke2/config.yaml
+sudo install -m 600 /dev/null /etc/rancher/rke2/config.yaml
+printf 'token: %s\\nnode-name: master\\nwrite-kubeconfig-mode: "0600"\\ntls-san:\\n  - %s\\n' \
+    {shlex.quote(token)} {shlex.quote(server_address)} | sudo tee /etc/rancher/rke2/config.yaml >/dev/null
 sudo systemctl enable rke2-server.service
 sudo systemctl start rke2-server.service
 sudo systemctl is-active --wait rke2-server.service
@@ -269,8 +270,9 @@ def agent_command(token, server_address):
     return f"""set -eu
 curl -sfL https://get.rke2.io | sudo INSTALL_RKE2_TYPE=agent INSTALL_RKE2_VERSION={shlex.quote(rke2_version)} sh -
 sudo mkdir -p /etc/rancher/rke2
+sudo install -m 600 /dev/null /etc/rancher/rke2/config.yaml
 printf 'server: https://%s:9345\\ntoken: %s\\nnode-name: worker\\n' \
-    {shlex.quote(server_address)} {shlex.quote(token)} | sudo tee /etc/rancher/rke2/config.yaml
+    {shlex.quote(server_address)} {shlex.quote(token)} | sudo tee /etc/rancher/rke2/config.yaml >/dev/null
 sudo systemctl enable rke2-agent.service
 sudo systemctl start rke2-agent.service
 sudo systemctl is-active --wait rke2-agent.service
@@ -311,7 +313,9 @@ rke2_kubeconfig = remote.Command(
         user="ubuntu",
     ),
     create="sudo cat /etc/rancher/rke2/rke2.yaml",
-    opts=pulumi.ResourceOptions(depends_on=[rke2_agent]),
+    opts=pulumi.ResourceOptions(
+        additional_secret_outputs=["stdout"], depends_on=[rke2_agent]
+    ),
 )
 
 rke2_kubeconfig.stdout.apply(

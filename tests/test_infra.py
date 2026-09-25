@@ -132,11 +132,16 @@ def test_rke2_commands(pulumi_stack):
     server = pulumi_stack.server_command("test-token", "203.0.113.20")
     agent = pulumi_stack.agent_command("test-token", "10.0.0.10")
     assert "INSTALL_RKE2_VERSION=v1.34.1+rke2r1" in server
+    assert "sudo install -m 600 /dev/null /etc/rancher/rke2/config.yaml" in server
     assert "tls-san:" in server
     assert "203.0.113.20" in server
+    assert 'write-kubeconfig-mode: "0600"' in server
+    assert "sudo tee /etc/rancher/rke2/config.yaml >/dev/null" in server
     assert "rke2-server.service" in server
+    assert "sudo install -m 600 /dev/null /etc/rancher/rke2/config.yaml" in agent
     assert "server: https://%s:9345" in agent
     assert "10.0.0.10" in agent
+    assert "sudo tee /etc/rancher/rke2/config.yaml >/dev/null" in agent
     assert "rke2-agent.service" in agent
 
 
@@ -164,3 +169,58 @@ def test_subnet_cidr(pulumi_stack):
 def test_rke2_version(pulumi_stack):
     """Test the configured RKE2 release."""
     assert pulumi_stack.rke2_version == "v1.34.1+rke2r1"
+
+
+@pulumi.runtime.test
+def test_rke2_ingress_rules(pulumi_stack):
+    """Test the RKE2-specific ingress rule ports, protocols, and source CIDRs."""
+
+    def check_rules(values):
+        (
+            rule3_protocol,
+            rule3_source,
+            rule3_tcp_options,
+            rule4_protocol,
+            rule4_source,
+            rule4_tcp_options,
+            rule5_protocol,
+            rule5_source,
+            rule5_tcp_options,
+            rule6_protocol,
+            rule6_source,
+            rule6_udp_options,
+        ) = values
+
+        assert rule3_protocol == 6
+        assert rule3_source == "10.0.0.0/16"
+        assert rule3_tcp_options["destination_port_range"] == {"min": 9345, "max": 9345}
+
+        assert rule4_protocol == 6
+        assert rule4_source == "10.0.0.0/16"
+        assert rule4_tcp_options["destination_port_range"] == {
+            "min": 10250,
+            "max": 10250,
+        }
+
+        assert rule5_protocol == 6
+        assert rule5_source == "10.0.0.0/16"
+        assert rule5_tcp_options["destination_port_range"] == {"min": 2379, "max": 2380}
+
+        assert rule6_protocol == 17
+        assert rule6_source == "10.0.0.0/16"
+        assert rule6_udp_options["destination_port_range"] == {"min": 8472, "max": 8472}
+
+    return pulumi.Output.all(
+        pulumi_stack.security_group_security_rule3.protocol,
+        pulumi_stack.security_group_security_rule3.source,
+        pulumi_stack.security_group_security_rule3.tcp_options,
+        pulumi_stack.security_group_security_rule4.protocol,
+        pulumi_stack.security_group_security_rule4.source,
+        pulumi_stack.security_group_security_rule4.tcp_options,
+        pulumi_stack.security_group_security_rule5.protocol,
+        pulumi_stack.security_group_security_rule5.source,
+        pulumi_stack.security_group_security_rule5.tcp_options,
+        pulumi_stack.security_group_security_rule6.protocol,
+        pulumi_stack.security_group_security_rule6.source,
+        pulumi_stack.security_group_security_rule6.udp_options,
+    ).apply(check_rules)
