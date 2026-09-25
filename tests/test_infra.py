@@ -16,8 +16,39 @@ import pytest
 class PulumiMocks(pulumi.runtime.Mocks):
     """Mocks for Pulumi engine during unit tests."""
 
+    def __init__(self):
+        self.resources = []
+
     def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        return [args.name + "_id", args.inputs]
+        self.resources.append(args)
+        outputs = dict(args.inputs)
+
+        if args.typ == "oci:core/instance:Instance":
+            if args.name == "oci-master":
+                outputs["public_ip"] = "203.0.113.10"
+                outputs["private_ip"] = "10.0.0.10"
+            else:
+                outputs["public_ip"] = "203.0.113.11"
+                outputs["private_ip"] = "10.0.0.11"
+
+        if args.typ == "command:remote:Command":
+            outputs.setdefault("stdout", "")
+            outputs.setdefault("stderr", "")
+            if args.name == "rke2-kubeconfig":
+                outputs["stdout"] = (
+                    "apiVersion: v1\n"
+                    "clusters:\n"
+                    "- cluster:\n"
+                    "    server: https://127.0.0.1:6443\n"
+                    "  name: default\n"
+                    "contexts: []\n"
+                    "current-context: default\n"
+                    "kind: Config\n"
+                    "preferences: {}\n"
+                    "users: []\n"
+                )
+
+        return [args.name + "_id", outputs]
 
     def call(self, args: pulumi.runtime.MockCallArgs):
         return {}
@@ -47,16 +78,23 @@ def pulumi_stack():
         + '",'
         '"oci-rke-provision:compartment-id":"ocid1.compartment.oc1..test",'
         '"oci-rke-provision:rke2-version":"v1.34.1+rke2r1",'
-        '"oci-rke-provision:rke2-token":"test-rke2-token"}'
+        '"oci-rke-provision:rke2-token":"test-rke2-token",'
+        '"oci-rke-provision:argocd-repo-url":"https://github.com/pasmon/pulumi-oci-rke.git",'
+        '"oci-rke-provision:argocd-repo-target-revision":"main",'
+        '"oci-rke-provision:argocd-repo-path":"gitops/bootstrap",'
+        '"oci-rke-provision:argocd-repo-username":"git",'
+        '"oci-rke-provision:argocd-repo-password":"test-password"}'
     )
 
-    pulumi.runtime.set_mocks(PulumiMocks(), project="oci-rke-provision", stack="test")
+    mocks = PulumiMocks()
+    pulumi.runtime.set_mocks(mocks, project="oci-rke-provision", stack="test")
 
     spec = importlib.util.spec_from_file_location(
         "main", os.path.abspath("__main__.py")
     )
     infra = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(infra)
+    infra.mock_resources = mocks.resources
 
     yield infra
 
@@ -101,6 +139,61 @@ def test_write_kubeconfig(pulumi_stack, tmp_path, monkeypatch):
         assert f.read() == content.replace("127.0.0.1", "203.0.113.10")
 
 
+def test_rewrite_kubeconfig_server(pulumi_stack):
+    """Test rewriting the kubeconfig server address."""
+    kubeconfig = "server: https://127.0.0.1:6443\napiVersion: v1\n"
+    assert (
+        pulumi_stack.rewrite_kubeconfig_server(kubeconfig, "203.0.113.20")
+        == "server: https://203.0.113.20:6443\napiVersion: v1\n"
+    )
+
+
+def test_argocd_repository_secret_builder(pulumi_stack):
+    """Test Argo CD repository secret generation and validation."""
+    https_secret = pulumi_stack.build_argocd_repository_secret_string_data(
+        "https://github.com/pasmon/pulumi-oci-rke.git",
+        repo_username="git",
+        repo_password="token",
+    )
+    assert https_secret == {
+        "type": "git",
+        "url": "https://github.com/pasmon/pulumi-oci-rke.git",
+        "username": "git",
+        "password": "token",
+    }
+
+    ssh_secret = pulumi_stack.build_argocd_repository_secret_string_data(
+        "git@github.com:pasmon/pulumi-oci-rke.git",
+        repo_ssh_private_key="PRIVATE KEY",
+    )
+    assert ssh_secret == {
+        "type": "git",
+        "url": "git@github.com:pasmon/pulumi-oci-rke.git",
+        "sshPrivateKey": "PRIVATE KEY",
+    }
+
+    assert (
+        pulumi_stack.build_argocd_repository_secret_string_data(
+            "https://github.com/pasmon/pulumi-oci-rke.git"
+        )
+        is None
+    )
+
+    with pytest.raises(ValueError, match="Set both argocd-repo-username and argocd-repo-password"):
+        pulumi_stack.build_argocd_repository_secret_string_data(
+            "https://github.com/pasmon/pulumi-oci-rke.git",
+            repo_username="git",
+        )
+
+    with pytest.raises(ValueError, match="Use either HTTPS credentials or an SSH private key"):
+        pulumi_stack.build_argocd_repository_secret_string_data(
+            "https://github.com/pasmon/pulumi-oci-rke.git",
+            repo_username="git",
+            repo_password="token",
+            repo_ssh_private_key="PRIVATE KEY",
+        )
+
+
 def test_network_resources(pulumi_stack):
     """Test VCN, Internet Gateway, Subnet, and Security Group creation."""
     assert pulumi_stack.vcn is not None
@@ -130,6 +223,33 @@ def test_rke2_cluster_config(pulumi_stack):
     assert pulumi_stack.rke2_server is not None
     assert pulumi_stack.rke2_agent is not None
     assert pulumi_stack.rke2_kubeconfig is not None
+    assert pulumi_stack.argocd_provider is not None
+    assert pulumi_stack.argocd_namespace is not None
+    assert pulumi_stack.argocd_release is not None
+    assert pulumi_stack.argocd_root_application is not None
+    assert pulumi_stack.argocd_bootstrap_repo is not None
+
+
+def test_argocd_config(pulumi_stack):
+    """Test Argo CD bootstrap configuration defaults and constants."""
+    assert pulumi_stack.argocd_repo_url == "https://github.com/pasmon/pulumi-oci-rke.git"
+    assert pulumi_stack.argocd_repo_target_revision == "main"
+    assert pulumi_stack.argocd_repo_path == "gitops/bootstrap"
+    assert pulumi_stack.ARGOCD_NAMESPACE == "argocd"
+    assert pulumi_stack.ARGOCD_HELM_CHART == "argo-cd"
+    assert pulumi_stack.ARGOCD_HELM_REPO == "https://argoproj.github.io/argo-helm"
+    assert pulumi_stack.ARGOCD_HELM_VERSION == "8.3.3"
+
+
+def test_argocd_resource_providers(pulumi_stack):
+    """Test that Argo CD resources are created through the Kubernetes provider."""
+    resources_by_name = {resource.name: resource for resource in pulumi_stack.mock_resources}
+
+    assert resources_by_name["rke2-kubernetes"].typ == "pulumi:providers:kubernetes"
+    assert resources_by_name["argocd-namespace"].provider == "rke2-kubernetes_id"
+    assert resources_by_name["argocd"].provider == "rke2-kubernetes_id"
+    assert resources_by_name["argocd-bootstrap-repo"].provider == "rke2-kubernetes_id"
+    assert resources_by_name["argocd-root-application"].provider == "rke2-kubernetes_id"
 
 
 def test_rke2_commands(pulumi_stack):
@@ -148,6 +268,90 @@ def test_rke2_commands(pulumi_stack):
     assert "10.0.0.10" in agent
     assert "sudo tee /etc/rancher/rke2/config.yaml >/dev/null" in agent
     assert "rke2-agent.service" in agent
+
+
+@pulumi.runtime.test
+def test_argocd_provider_kubeconfig(pulumi_stack):
+    """Test the Kubernetes provider uses the rewritten RKE2 kubeconfig."""
+    return pulumi_stack.argocd_provider.kubeconfig.apply(
+        lambda kubeconfig: assert_argocd_provider_kubeconfig(kubeconfig)
+    )
+
+
+def assert_argocd_provider_kubeconfig(kubeconfig):
+    """Assert the Kubernetes provider is pointed at the public API endpoint."""
+    assert "https://203.0.113.10:6443" in kubeconfig
+    assert "127.0.0.1" not in kubeconfig
+
+
+@pulumi.runtime.test
+def test_argocd_release_values(pulumi_stack):
+    """Test the Argo CD Helm release values."""
+    return pulumi.Output.all(
+        pulumi_stack.argocd_release.version,
+        pulumi_stack.argocd_release.values,
+        pulumi_stack.argocd_release.namespace,
+    ).apply(check_argocd_release_values)
+
+
+def check_argocd_release_values(values):
+    """Assert the Argo CD Helm release configuration."""
+    version, release_values, namespace = values
+    assert version == "8.3.3"
+    assert namespace == "argocd"
+    assert release_values == {
+        "crds": {"install": True},
+        "server": {"service": {"type": "ClusterIP"}},
+    }
+
+
+@pulumi.runtime.test
+def test_argocd_repository_secret(pulumi_stack):
+    """Test the optional Argo CD bootstrap repository secret."""
+    return pulumi.Output.all(
+        pulumi_stack.argocd_bootstrap_repo.metadata,
+        pulumi_stack.argocd_bootstrap_repo.string_data,
+        pulumi_stack.argocd_bootstrap_repo.type,
+    ).apply(check_argocd_repository_secret)
+
+
+def check_argocd_repository_secret(values):
+    """Assert the repository secret metadata and credentials."""
+    metadata, string_data, secret_type = values
+    assert metadata["name"] == "bootstrap-repo"
+    assert metadata["namespace"] == "argocd"
+    assert metadata["labels"] == {"argocd.argoproj.io/secret-type": "repository"}
+    assert string_data == {
+        "type": "git",
+        "url": "https://github.com/pasmon/pulumi-oci-rke.git",
+        "username": "git",
+        "password": "test-password",
+    }
+    assert secret_type == "Opaque"
+
+
+@pulumi.runtime.test
+def test_argocd_root_application_spec(pulumi_stack):
+    """Test the bootstrap root Application spec."""
+    return pulumi_stack.argocd_root_application.spec.apply(check_argocd_root_application_spec)
+
+
+def check_argocd_root_application_spec(spec):
+    """Assert the seeded root Application configuration."""
+    assert spec["project"] == "default"
+    assert spec["source"] == {
+        "repoURL": "https://github.com/pasmon/pulumi-oci-rke.git",
+        "targetRevision": "main",
+        "path": "gitops/bootstrap",
+    }
+    assert spec["destination"] == {
+        "server": "https://kubernetes.default.svc",
+        "namespace": "argocd",
+    }
+    assert spec["syncPolicy"] == {
+        "automated": {"prune": True, "selfHeal": True},
+        "syncOptions": ["CreateNamespace=true"],
+    }
 
 
 @pulumi.runtime.test
