@@ -15,6 +15,7 @@ black = "*"
 pre-commit = "*"
 ruff = "*"
 bandit = {extras = ["toml"], version = "*"}
+pytest = "*"
 
 [requires]
 python_version = "3.14"
