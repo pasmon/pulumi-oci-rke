@@ -27,6 +27,8 @@ sudo netfilter-persistent save
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl
 echo 'AllowTcpForwarding yes' | sudo tee -a /etc/ssh/sshd_config
+echo 'AcceptEnv PULUMI_COMMAND_STDOUT PULUMI_COMMAND_STDERR' | sudo tee -a /etc/ssh/sshd_config
+sudo systemctl restart ssh
 """
 encodedBytes = base64.b64encode(USER_DATA.encode("utf-8"))
 USER_DATA_BASE64 = str(encodedBytes, "utf-8")
