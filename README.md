@@ -26,9 +26,9 @@
 
     `uv sync`
 
-5. Run Python tools through uv:
+5. Activate the virtual environment created by uv:
 
-    `uv run python --version`
+    `source .venv/bin/activate`
 
 6. Set the OCI compartment ID, and path to your private and public SSH key with Pulumi:
 

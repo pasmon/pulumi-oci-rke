@@ -13,7 +13,7 @@
 - Run one test with its pytest node ID, for example:
   `uv run pytest -v tests/test_infra.py::test_user_data_configuration`.
 - Pre-commit hooks can be run with `uv run pre-commit run --all-files`. Commit messages are checked for Conventional Commits format.
-- This project has no separate build step. Deploy from a selected Pulumi stack with `pulumi up`; the required project config keys are `ssh-key-path`, `ssh-public-key-path`, and secret `compartment-id`.
+- This project has no separate build step. Deploy from a selected Pulumi stack with `uv run pulumi up`; the required project config keys are `ssh-key-path`, `ssh-public-key-path`, and secret `compartment-id`.
 
 ## Architecture
 
