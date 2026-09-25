@@ -72,6 +72,11 @@ def test_user_data_configuration(pulumi_stack):
     """Test user_data script generation and base64 encoding."""
     assert "sudo iptables -F" in pulumi_stack.USER_DATA
     assert "AllowTcpForwarding yes" in pulumi_stack.USER_DATA
+    assert (
+        "AcceptEnv PULUMI_COMMAND_STDOUT PULUMI_COMMAND_STDERR"
+        in pulumi_stack.USER_DATA
+    )
+    assert "sudo systemctl restart ssh" in pulumi_stack.USER_DATA
     assert "ca-certificates curl" in pulumi_stack.USER_DATA
     assert "docker-ce" not in pulumi_stack.USER_DATA
 
