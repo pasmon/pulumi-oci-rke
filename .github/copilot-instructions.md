@@ -17,11 +17,11 @@
 
 ## Architecture
 
-- `__main__.py` is the complete Pulumi program and executes eagerly when imported. It reads the configured SSH key files, creates the OCI network and two ARM compute instances, waits for cloud-init over SSH, and then creates an RKE cluster across those instances.
+- `__main__.py` is the complete Pulumi program and executes eagerly when imported. It reads the configured SSH key files, creates the OCI network and two ARM compute instances, waits for cloud-init over SSH, and then installs RKE2 server/agent services across those instances.
 - The OCI layer consists of a VCN, internet gateway, default route table, subnet, network security group, and ingress rules. Both instances attach to that subnet and security group.
-- Instance cloud-init installs the pinned Docker packages and prepares Ubuntu for RKE. `pulumi_command.remote.Command` resources wait for `cloud-init status --wait`; the RKE cluster explicitly depends on both commands.
-- The first node has `controlplane`, `etcd`, and `worker` roles; the second is worker-only. The deployment is tied to OCI Stockholm AD-1, an Ubuntu ARM image OCID, and the `VM.Standard.A1.Flex` free-tier shape.
-- The generated RKE kubeconfig is written asynchronously from a Pulumi `Output.apply` callback to `out/rke_kubeconfig`. Public IPs, RKE state, and running system images are exported as stack outputs.
+- Instance cloud-init installs the RKE2 prerequisites and prepares Ubuntu. `pulumi_command.remote.Command` resources wait for `cloud-init status --wait`; the RKE2 server and agent explicitly depend on those commands and on each other.
+- The first node runs the RKE2 server, control plane, and embedded etcd; the second runs an RKE2 agent. The deployment is tied to OCI Stockholm AD-1, an Ubuntu ARM image OCID, and the `VM.Standard.A1.Flex` free-tier shape.
+- The generated RKE2 kubeconfig is written asynchronously from a Pulumi `Output.apply` callback to `out/rke2_kubeconfig`. Public IPs and the configured RKE2 version are exported as stack outputs.
 
 ## Repository conventions
 

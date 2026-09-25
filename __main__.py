@@ -1,17 +1,19 @@
-"""Pulumi program to deploy RKE cluster to 2 free tier nodes on Oracle Cloud."""
+"""Pulumi program to deploy an RKE2 cluster to two free-tier OCI nodes."""
 
 import base64
 import os
+import shlex
 
 import pulumi
 import pulumi_oci as oci
-import pulumi_rke as rke
 from pulumi_command import remote
 
 config = pulumi.Config()
 ssh_key_path = config.require("ssh-key-path")
 ssh_public_key_path = config.require("ssh-public-key-path")
 compartment_id = config.require("compartment-id")
+rke2_version = config.require("rke2-version")
+rke2_token = config.require_secret("rke2-token")
 
 with open(ssh_key_path, "r", encoding="utf-8") as ssh_key_file:
     ssh_key_data = ssh_key_file.read()
@@ -19,37 +21,11 @@ with open(ssh_key_path, "r", encoding="utf-8") as ssh_key_file:
 with open(ssh_public_key_path, "r", encoding="utf-8") as ssh_public_file:
     ssh_public_key = ssh_public_file.read()
 
-# install docker and do modifications for rke installation
-PACKAGES_TO_REMOVE = "ufw docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc"
-PACKAGES_TO_INSTALL = (
-    "docker-ce=$VERSION_STRING docker-ce-cli=$VERSION_STRING containerd.io docker-buildx-plugin "
-    "docker-compose-plugin"
-)
-
-USER_DATA = f"""#!/bin/bash -x
+USER_DATA = """#!/bin/bash -x
 sudo iptables -F
 sudo netfilter-persistent save
-for pkg in {PACKAGES_TO_REMOVE}; do sudo apt-get remove -y $pkg; done
-# Add Docker's official GPG key:
 sudo apt-get update
-sudo apt-get install -y ca-certificates curl gnupg
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
-# Add the repository to Apt sources:
-echo \
-  "deb [arch="$(dpkg --print-architecture)" \
-  signed-by=/etc/apt/keyrings/docker.gpg] \
-    https://download.docker.com/linux/ubuntu" \
-    "$(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-VERSION_STRING=5:20.10.24~3-0~ubuntu-jammy
-for pkg in {PACKAGES_TO_INSTALL}; do sudo apt-get install -y --allow-downgrades $pkg; done
-sudo groupadd docker
-sudo usermod -aG docker ubuntu
-sudo sysctl -w net.bridge.bridge-nf-call-iptables=1
-sudo sysctl -p
+sudo apt-get install -y ca-certificates curl
 echo 'AllowTcpForwarding yes' | sudo tee -a /etc/ssh/sshd_config
 """
 encodedBytes = base64.b64encode(USER_DATA.encode("utf-8"))
@@ -121,8 +97,8 @@ security_group_security_rule2 = oci.core.NetworkSecurityGroupSecurityRule(
     source_type="CIDR_BLOCK",
     tcp_options=oci.core.NetworkSecurityGroupSecurityRuleTcpOptionsArgs(
         destination_port_range=oci.core.NetworkSecurityGroupSecurityRuleTcpOptionsDestinationPortRangeArgs(
-            max=10250,
-            min=10250,
+            max=6443,
+            min=6443,
         ),
     ),
 )
@@ -133,12 +109,12 @@ security_group_security_rule3 = oci.core.NetworkSecurityGroupSecurityRule(
     network_security_group_id=security_group.id,
     direction="INGRESS",
     protocol=6,
-    source="0.0.0.0/0",
+    source="10.0.0.0/16",
     source_type="CIDR_BLOCK",
     tcp_options=oci.core.NetworkSecurityGroupSecurityRuleTcpOptionsArgs(
         destination_port_range=oci.core.NetworkSecurityGroupSecurityRuleTcpOptionsDestinationPortRangeArgs(
-            max=2379,
-            min=2379,
+            max=9345,
+            min=9345,
         ),
     ),
 )
@@ -148,12 +124,42 @@ security_group_security_rule4 = oci.core.NetworkSecurityGroupSecurityRule(
     network_security_group_id=security_group.id,
     direction="INGRESS",
     protocol=6,
-    source="0.0.0.0/0",
+    source="10.0.0.0/16",
     source_type="CIDR_BLOCK",
     tcp_options=oci.core.NetworkSecurityGroupSecurityRuleTcpOptionsArgs(
         destination_port_range=oci.core.NetworkSecurityGroupSecurityRuleTcpOptionsDestinationPortRangeArgs(
-            max=6443,
-            min=6443,
+            max=10250,
+            min=10250,
+        ),
+    ),
+)
+
+security_group_security_rule5 = oci.core.NetworkSecurityGroupSecurityRule(
+    "oci-securitygroup-rule5",
+    network_security_group_id=security_group.id,
+    direction="INGRESS",
+    protocol=6,
+    source="10.0.0.0/16",
+    source_type="CIDR_BLOCK",
+    tcp_options=oci.core.NetworkSecurityGroupSecurityRuleTcpOptionsArgs(
+        destination_port_range=oci.core.NetworkSecurityGroupSecurityRuleTcpOptionsDestinationPortRangeArgs(
+            max=2380,
+            min=2379,
+        ),
+    ),
+)
+
+security_group_security_rule6 = oci.core.NetworkSecurityGroupSecurityRule(
+    "oci-securitygroup-rule6",
+    network_security_group_id=security_group.id,
+    direction="INGRESS",
+    protocol=17,
+    source="10.0.0.0/16",
+    source_type="CIDR_BLOCK",
+    udp_options=oci.core.NetworkSecurityGroupSecurityRuleUdpOptionsArgs(
+        destination_port_range=oci.core.NetworkSecurityGroupSecurityRuleUdpOptionsDestinationPortRangeArgs(
+            max=8472,
+            min=8472,
         ),
     ),
 )
@@ -180,7 +186,7 @@ def create_instance(instance_config):
             nsg_ids=[instance_config["security_group_id"]],
         ),
         source_details=oci.core.InstanceSourceDetailsArgs(
-            source_id="ocid1.image.oc1.eu-stockholm-1.aaaaaaaabn32f7fcafa3mf3jim2yjlak4zbk6cqwpyolhspg2miozqephuha",
+            source_id="ocid1.image.oc1.eu-stockholm-1.aaaaaaaai7jn6m3ethcud7hivw4ad32st7f7l24xqqmvigqfco5zffceqj3q",
             source_type="image",
         ),
         shape_config=oci.core.InstanceShapeConfigArgs(
@@ -236,46 +242,84 @@ vm2_ready = remote.Command(
 )
 
 
-def write_kubeconfig(data):
-    """Write kubeconfig from RKE to 'out' directory."""
+def write_kubeconfig(data, server_address):
+    """Write kubeconfig from RKE2 to 'out' directory."""
     if not os.path.exists("out"):
         os.mkdir("out")
     if data is not None:
-        with open("out/rke_kubeconfig", "w", encoding="utf8") as kubeconfig:
-            kubeconfig.write(data)
+        with open("out/rke2_kubeconfig", "w", encoding="utf8") as kubeconfig:
+            kubeconfig.write(data.replace("127.0.0.1", server_address))
 
 
-rke_cluster = rke.Cluster(
-    "masterofclusters",
-    nodes=[
-        rke.ClusterNodeArgs(
-            hostname_override="master",
-            address=vm1.public_ip,
-            internal_address=vm1.private_ip,
-            user="ubuntu",
-            roles=["controlplane", "etcd", "worker"],
-        ),
-        rke.ClusterNodeArgs(
-            hostname_override="worker",
-            address=vm2.public_ip,
-            internal_address=vm2.private_ip,
-            user="ubuntu",
-            roles=["worker"],
-        ),
-    ],
-    services_kube_proxy_deprecated=rke.ClusterServicesKubeProxyDeprecatedArgs(
-        extra_args={"healthz-bind-address": "127.0.0.1"}
+def server_command(token, server_address):
+    """Build the RKE2 server installation command."""
+    return f"""set -eu
+curl -sfL https://get.rke2.io | sudo INSTALL_RKE2_VERSION={shlex.quote(rke2_version)} sh -
+sudo mkdir -p /etc/rancher/rke2
+printf 'token: %s\\nnode-name: master\\nwrite-kubeconfig-mode: "0644"\\ntls-san:\\n  - %s\\n' \
+    {shlex.quote(token)} {shlex.quote(server_address)} | sudo tee /etc/rancher/rke2/config.yaml
+sudo systemctl enable rke2-server.service
+sudo systemctl start rke2-server.service
+sudo systemctl is-active --wait rke2-server.service
+"""
+
+
+def agent_command(token, server_address):
+    """Build the RKE2 agent installation command."""
+    return f"""set -eu
+curl -sfL https://get.rke2.io | sudo INSTALL_RKE2_TYPE=agent INSTALL_RKE2_VERSION={shlex.quote(rke2_version)} sh -
+sudo mkdir -p /etc/rancher/rke2
+printf 'server: https://%s:9345\\ntoken: %s\\nnode-name: worker\\n' \
+    {shlex.quote(server_address)} {shlex.quote(token)} | sudo tee /etc/rancher/rke2/config.yaml
+sudo systemctl enable rke2-agent.service
+sudo systemctl start rke2-agent.service
+sudo systemctl is-active --wait rke2-agent.service
+"""
+
+
+rke2_server = remote.Command(
+    "rke2-server",
+    connection=remote.ConnectionArgs(
+        host=vm1.public_ip,
+        private_key=ssh_key_data,
+        user="ubuntu",
     ),
-    cluster_name="masterofclusters",
-    ssh_agent_auth=False,
-    ssh_key_path=ssh_key_path,
-    enable_cri_dockerd=True,
-    opts=pulumi.ResourceOptions(depends_on=[vm1_ready, vm2_ready]),
+    create=pulumi.Output.all(rke2_token, vm1.public_ip).apply(
+        lambda values: server_command(values[0], values[1])
+    ),
+    opts=pulumi.ResourceOptions(depends_on=[vm1_ready]),
 )
 
-rke_cluster.kube_config_yaml.apply(lambda a: write_kubeconfig(data=a))
+rke2_agent = remote.Command(
+    "rke2-agent",
+    connection=remote.ConnectionArgs(
+        host=vm2.public_ip,
+        private_key=ssh_key_data,
+        user="ubuntu",
+    ),
+    create=pulumi.Output.all(rke2_token, vm1.private_ip).apply(
+        lambda values: agent_command(values[0], values[1])
+    ),
+    opts=pulumi.ResourceOptions(depends_on=[vm2_ready, rke2_server]),
+)
 
-pulumi.export("images", rke_cluster.running_system_images)
+rke2_kubeconfig = remote.Command(
+    "rke2-kubeconfig",
+    connection=remote.ConnectionArgs(
+        host=vm1.public_ip,
+        private_key=ssh_key_data,
+        user="ubuntu",
+    ),
+    create="sudo cat /etc/rancher/rke2/rke2.yaml",
+    opts=pulumi.ResourceOptions(depends_on=[rke2_agent]),
+)
+
+rke2_kubeconfig.stdout.apply(
+    lambda data: pulumi.Output.all(data, vm1.public_ip).apply(
+        lambda values: write_kubeconfig(values[0], values[1])
+    )
+)
+
 pulumi.export("master_pip", vm1.public_ip)
 pulumi.export("worker_pip", vm2.public_ip)
-pulumi.export("state", rke_cluster.rke_state)
+pulumi.export("rke2_version", rke2_version)

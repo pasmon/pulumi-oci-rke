@@ -503,7 +503,6 @@ dependencies = [
     { name = "pulumi" },
     { name = "pulumi-command" },
     { name = "pulumi-oci" },
-    { name = "pulumi-rke" },
 ]
 
 [package.dev-dependencies]
@@ -521,7 +520,6 @@ requires-dist = [
     { name = "pulumi" },
     { name = "pulumi-command" },
     { name = "pulumi-oci" },
-    { name = "pulumi-rke" },
 ]
 
 [package.metadata.requires-dev]
@@ -532,20 +530,6 @@ dev = [
     { name = "pylint" },
     { name = "pytest" },
     { name = "ruff" },
-]
-
-[[package]]
-name = "pulumi-rke"
-version = "3.6.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "parver" },
-    { name = "pulumi" },
-    { name = "semver" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/01/fc/c79aeff1d70edc34f1cba7570ff64f30752b64f63aea9eab232632b24f95/pulumi_rke-3.6.0.tar.gz", hash = "sha256:2d9153bcb051162cbe36791827939fc02f6775f8317999da7e53e765e6f451e8", size = 85336, upload-time = "2024-12-04T13:16:00.269Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/21/18/fbbecb73f85145742835490080337ef77b0b26325a2f25e90ee1e8402a89/pulumi_rke-3.6.0-py3-none-any.whl", hash = "sha256:7b99923dc7c753a91d31d41e61b2c27cd314d04fc77e3052154db214db5821a8", size = 87511, upload-time = "2024-12-04T13:15:59.05Z" },
 ]
 
 [[package]]
