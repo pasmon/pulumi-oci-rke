@@ -117,9 +117,11 @@ to own the same Argo CD resources at the same time:
 1. Pulumi installs Argo CD and creates the `bootstrap-root` `Application`.
 2. Argo CD syncs `gitops/bootstrap`, which creates the `bootstrap` project and
    the `argocd-self` child `Application`.
-3. Review `argocd-self`, then disable or remove the Pulumi-managed Argo CD
-   release before manually syncing or enabling automation on `argocd-self`.
-4. After the handoff, keep Argo CD's steady-state chart configuration in Git
+3. Review `argocd-self`, manually sync it while the Pulumi-managed Argo CD
+   release is still installed, and verify it is healthy.
+4. After `argocd-self` has taken over, disable or remove the Pulumi-managed
+   Argo CD release before enabling automation on `argocd-self`.
+5. After the handoff, keep Argo CD's steady-state chart configuration in Git
    and avoid reintroducing the same resources under Pulumi management.
 
 RKE2 releases are listed in the [Rancher RKE2 releases](https://github.com/rancher/rke2/releases).

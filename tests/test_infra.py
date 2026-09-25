@@ -219,6 +219,38 @@ def test_argocd_repository_secret_builder(pulumi_stack):
         )
 
     with pytest.raises(
+        ValueError,
+        match="Use SSH repository URLs only with argocd-repo-ssh-private-key",
+    ):
+        pulumi_stack.build_argocd_repository_secret_string_data(
+            "git@github.com:pasmon/pulumi-oci-rke.git",
+            repo_username="git",
+            repo_password="token",
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Use SSH repository URLs only with argocd-repo-ssh-private-key",
+    ):
+        pulumi_stack.build_argocd_repository_secret_string_data(
+            "ssh://git@github.com/pasmon/pulumi-oci-rke.git",
+            github_app_auth={
+                "id": "12345",
+                "installation_id": "67890",
+                "private_key": "PRIVATE KEY",
+            },
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="Use argocd-repo-ssh-private-key only with ssh:// or SCP-style SSH repository URLs",
+    ):
+        pulumi_stack.build_argocd_repository_secret_string_data(
+            "https://github.com/pasmon/pulumi-oci-rke.git",
+            repo_ssh_private_key="PRIVATE KEY",
+        )
+
+    with pytest.raises(
         ValueError, match="Use only one Argo CD repository authentication method"
     ):
         pulumi_stack.build_argocd_repository_secret_string_data(

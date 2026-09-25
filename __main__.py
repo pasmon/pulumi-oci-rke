@@ -2,6 +2,7 @@
 
 import base64
 import os
+import re
 import shlex
 
 import pulumi
@@ -283,6 +284,9 @@ def build_argocd_repository_secret_string_data(
     github_app_auth=None,
 ):
     """Build the optional Argo CD repository secret payload."""
+    is_ssh_repo_url = repo_url.startswith("ssh://") or re.match(
+        r"^[^/@:\s]+@[^:/\s]+:.+$", repo_url
+    )
     github_app_auth = github_app_auth or {}
     github_app_id = github_app_auth.get("id")
     github_app_installation_id = github_app_auth.get("installation_id")
@@ -312,6 +316,14 @@ def build_argocd_repository_secret_string_data(
         raise ValueError(
             "Set argocd-github-app-id, argocd-github-app-installation-id, "
             "and argocd-github-app-private-key together, or omit them all."
+        )
+    if is_ssh_repo_url and (has_https_auth or has_github_app_auth):
+        raise ValueError(
+            "Use SSH repository URLs only with argocd-repo-ssh-private-key."
+        )
+    if not is_ssh_repo_url and has_ssh_auth:
+        raise ValueError(
+            "Use argocd-repo-ssh-private-key only with ssh:// or SCP-style SSH repository URLs."
         )
     if repo_ssh_private_key is not None:
         return {
