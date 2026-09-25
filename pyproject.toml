@@ -1,3 +1,28 @@
+[project]
+name = "pulumi-oci-rke"
+version = "0.1.0"
+description = "Provision an RKE Kubernetes cluster on Oracle Cloud Infrastructure."
+requires-python = ">=3.14"
+dependencies = [
+    "pulumi",
+    "pulumi-command",
+    "pulumi-oci",
+    "pulumi-rke",
+]
+
+[dependency-groups]
+dev = [
+    "bandit[toml]",
+    "black",
+    "pylint",
+    "pre-commit",
+    "pytest",
+    "ruff",
+]
+
+[tool.uv]
+package = false
+
 [tool.ruff]
 line-length = 120
 

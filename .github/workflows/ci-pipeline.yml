@@ -14,32 +14,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pipenv
-        run: pipx install pipenv
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
 
       - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: "3.14"
-          cache: "pipenv"
+        run: uv python install 3.14
 
       - name: Install dependencies
-        run: pipenv install --dev
+        run: uv sync --locked
 
       - name: Syntax check
-        run: pipenv run python -m py_compile __main__.py tests/*.py
+        run: uv run python -m py_compile __main__.py tests/*.py
 
       - name: Lint with Ruff
-        run: pipenv run ruff check .
+        run: uv run ruff check .
 
       - name: Format check with Black
-        run: pipenv run black --check .
+        run: uv run black --check .
 
       - name: Lint with Pylint
-        run: pipenv run pylint __main__.py tests
+        run: uv run pylint __main__.py tests
 
       - name: Security check with Bandit
-        run: pipenv run bandit -c pyproject.toml -r . -x ./tests
+        run: uv run bandit -c pyproject.toml -r . -x ./tests -x ./.venv
 
       - name: Run Unit Tests
-        run: pipenv run pytest -v
+        run: uv run pytest -v
