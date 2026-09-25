@@ -39,7 +39,7 @@ jobs:
         run: pipenv run pylint __main__.py tests
 
       - name: Security check with Bandit
-        run: pipenv run bandit -r .
+        run: pipenv run bandit -c pyproject.toml -r . -x ./tests
 
       - name: Run Unit Tests
         run: pipenv run pytest -v
