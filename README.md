@@ -5,7 +5,7 @@
 
 - Oracle Cloud Infrastructure account
 - Python
-  - Pipenv
+  - uv
 - Pulumi
 
 ## Install Rancher Kubernetes Engine (RKE)
@@ -22,13 +22,13 @@
 
    https://www.pulumi.com/docs/get-started/install/
 
-4. Install Python packages with pipenv (https://pipenv.pypa.io/en/latest/install/#installing-pipenv):
+4. Install uv (https://docs.astral.sh/uv/getting-started/installation/) and the Python dependencies:
 
-    `pipenv install`
+    `uv sync`
 
-5. Activate Python virtual environment:
+5. Activate the virtual environment created by uv:
 
-    `pipenv shell`
+    `source .venv/bin/activate`
 
 6. Set the OCI compartment ID, and path to your private and public SSH key with Pulumi:
 
