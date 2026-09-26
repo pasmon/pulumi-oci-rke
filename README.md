@@ -35,7 +35,8 @@ replaced by this deployment rather than upgraded in place.
     `source .venv/bin/activate`
 
 6. Set the OCI compartment ID, SSH key paths, an RKE2 release, and a private
-   cluster join token with Pulumi:
+   cluster join token with Pulumi. Also configure the Git repository that Argo
+   CD should bootstrap from:
 
    `pulumi login --local`
 
@@ -53,6 +54,33 @@ replaced by this deployment rather than upgraded in place.
 
    `pulumi config set --secret rke2-token <long random cluster token>`
 
+   `pulumi config set argocd-repo-url <https or ssh URL for this repository>`
+
+   `pulumi config set argocd-repo-target-revision <git revision to sync>`
+
+   `pulumi config set argocd-repo-path gitops/bootstrap`
+
+   Optional HTTPS credentials for a private Git repository:
+
+   `pulumi config set argocd-repo-username <git username>`
+
+   `pulumi config set --secret argocd-repo-password <git token or password>`
+
+   Optional SSH credentials for a private Git repository:
+
+   `pulumi config set --secret argocd-repo-ssh-private-key @<path to SSH private key>`
+
+   Optional GitHub App credentials for a private GitHub repository:
+
+   `pulumi config set argocd-github-app-id <GitHub App ID>`
+
+   `pulumi config set argocd-github-app-installation-id <GitHub App installation ID>`
+
+   `pulumi config set --secret argocd-github-app-private-key @<path to GitHub App PEM private key>`
+
+   Configure only one authentication mode for Argo CD repository access:
+   HTTPS credentials, SSH private key, or GitHub App credentials.
+
 7. Launch 2 free tier ARM instances to Oracle Cloud and deploy RKE2 with Pulumi:
 
     `pulumi up`
@@ -65,5 +93,35 @@ The second instance runs an RKE2 agent. The deployment is intentionally
 destroy/recreate because the previous RKE1 cluster had no workloads to migrate.
 The generated server certificate includes the server's public IP, allowing
 kubectl clients and GUI tools such as FreeLens to verify the API endpoint.
+
+Pulumi also uses the generated RKE2 kubeconfig to bootstrap Argo CD into the
+`argocd` namespace with the official Helm chart. The initial Argo CD server
+service remains `ClusterIP`, so access is internal-only unless you later expose
+it deliberately through Kubernetes networking or additional OCI rules.
+
+## Argo CD bootstrap flow
+
+- Pulumi installs Argo CD after the OCI instances, cloud-init completion, RKE2
+  server, RKE2 agent, and kubeconfig retrieval steps have succeeded.
+- Pulumi seeds a root Argo CD `Application` named `bootstrap-root` that points
+  back to this repository and syncs the `gitops/bootstrap` path automatically.
+- `gitops/bootstrap/bootstrap-project.yaml` defines the bootstrap `AppProject`.
+- `gitops/bootstrap/argocd-self-application.yaml` defines the long-term Argo CD
+  self-management `Application`, but it is intentionally not auto-synced yet.
+
+## Self-management handoff
+
+This repository uses a two-phase handoff so Pulumi and Argo CD do not both try
+to own the same Argo CD resources at the same time:
+
+1. Pulumi installs Argo CD and creates the `bootstrap-root` `Application`.
+2. Argo CD syncs `gitops/bootstrap`, which creates the `bootstrap` project and
+   the `argocd-self` child `Application`.
+3. Review `argocd-self`, manually sync it while the Pulumi-managed Argo CD
+   release is still installed, and verify it is healthy.
+4. After `argocd-self` has taken over, disable or remove the Pulumi-managed
+   Argo CD release before enabling automation on `argocd-self`.
+5. After the handoff, keep Argo CD's steady-state chart configuration in Git
+   and avoid reintroducing the same resources under Pulumi management.
 
 RKE2 releases are listed in the [Rancher RKE2 releases](https://github.com/rancher/rke2/releases).
