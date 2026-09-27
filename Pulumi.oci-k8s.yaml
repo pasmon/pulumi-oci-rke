@@ -1,0 +1,10 @@
+encryptionsalt: v1:XWxP+P0UkZo=:v1:P8cJWVIG06EmqUga:1Qr5mvmKsOnCHuQ6K8FhcwMZwQrJ1A==
+config:
+  oci-rke-provision:ssh-key-path: D:\kikkailu\oci-ssh.txt
+  oci-rke-provision:ssh-public-key-path: D:\kikkailu\oci-ssh.pub
+  oci-rke-provision:compartment-id:
+    secure: v1:NdntEdPw1Co9OeCG:/ORIBMWPxTORakHaboIw20fDQIfxVW1X4yh3qbRwqS58k2ugR7x9vB8ucPlcfb6lMh5kRI3q31uXAWKLIjZGzGuY2RgCbaQlBWHsbkgKa6UQVKnQt4NMdQTLQsZ6Vww=
+  oci-rke-provision:rke2-version: v1.37.0+rke2r1
+  oci-rke-provision:rke2-token:
+    secure: v1:3+iFG6DITJDZ1mPb:N0nsJa5Fcr9KQKAWFQmae/K5o6n3AQ1RdWEgbPdslSXFj1HX9ezJTg==
+  oci-rke-provision:argocd-repo-url: pasmon/argo-apps

@@ -366,7 +366,9 @@ sudo systemctl is-active --wait rke2-server.service
 def agent_command(token, server_address):
     """Build the RKE2 agent installation command."""
     return f"""set -eu
-curl -sfL https://get.rke2.io | sudo INSTALL_RKE2_TYPE=agent INSTALL_RKE2_VERSION={shlex.quote(rke2_version)} sh -
+curl -sfL https://get.rke2.io | sudo \
+  --disable=rke2-traefik,rke2-traefik-crd \
+  INSTALL_RKE2_TYPE=agent INSTALL_RKE2_VERSION={shlex.quote(rke2_version)} sh -
 sudo mkdir -p /etc/rancher/rke2
 sudo install -m 600 /dev/null /etc/rancher/rke2/config.yaml
 printf 'server: https://%s:9345\\ntoken: %s\\nnode-name: worker\\n' \
