@@ -355,8 +355,17 @@ def server_command(token, server_address):
 curl -sfL https://get.rke2.io | sudo INSTALL_RKE2_VERSION={shlex.quote(rke2_version)} sh -
 sudo mkdir -p /etc/rancher/rke2
 sudo install -m 600 /dev/null /etc/rancher/rke2/config.yaml
-printf 'token: %s\\nnode-name: master\\nwrite-kubeconfig-mode: "0600"\\ntls-san:\\n  - %s\\n' \
-    {shlex.quote(token)} {shlex.quote(server_address)} | sudo tee /etc/rancher/rke2/config.yaml >/dev/null
+sudo tee /etc/rancher/rke2/config.yaml << 'EOF' > /dev/null
+token: {token}
+node-name: master
+write-kubeconfig-mode: "0600"
+tls-san:
+  - {server_address}
+disable:
+  - rke2-traefik
+  - rke2-traefik-crd
+disable-etcd: true
+EOF
 sudo systemctl enable rke2-server.service
 sudo systemctl start rke2-server.service
 sudo systemctl is-active --wait rke2-server.service
@@ -367,12 +376,18 @@ def agent_command(token, server_address):
     """Build the RKE2 agent installation command."""
     return f"""set -eu
 curl -sfL https://get.rke2.io | sudo \
-  --disable=rke2-traefik,rke2-traefik-crd \
   INSTALL_RKE2_TYPE=agent INSTALL_RKE2_VERSION={shlex.quote(rke2_version)} sh -
 sudo mkdir -p /etc/rancher/rke2
 sudo install -m 600 /dev/null /etc/rancher/rke2/config.yaml
-printf 'server: https://%s:9345\\ntoken: %s\\nnode-name: worker\\n' \
-    {shlex.quote(server_address)} {shlex.quote(token)} | sudo tee /etc/rancher/rke2/config.yaml >/dev/null
+sudo tee /etc/rancher/rke2/config.yaml << 'EOF' > /dev/null
+server: https://{server_address}:9345
+token: {token}
+node-name: worker
+disable:
+  - rke2-traefik
+  - rke2-traefik-crd
+disable-etcd: true
+EOF
 sudo systemctl enable rke2-agent.service
 sudo systemctl start rke2-agent.service
 sudo systemctl is-active --wait rke2-agent.service
