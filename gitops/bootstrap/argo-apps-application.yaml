@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-app-of-apps
+  namespace: argocd
+spec:
+  project: bootstrap
+  source:
+    repoURL: https://github.com/pasmon/argo-apps.git
+    targetRevision: main
+    path: app-of-apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

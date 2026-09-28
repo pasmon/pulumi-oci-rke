@@ -105,9 +105,12 @@ it deliberately through Kubernetes networking or additional OCI rules.
   server, RKE2 agent, and kubeconfig retrieval steps have succeeded.
 - Pulumi seeds a root Argo CD `Application` named `bootstrap-root` that points
   back to this repository and syncs the `gitops/bootstrap` path automatically.
-- `gitops/bootstrap/bootstrap-project.yaml` defines the bootstrap `AppProject`.
+- `gitops/bootstrap/bootstrap-project.yaml` defines the bootstrap `AppProject` and allows the `argo-apps` repository as a source.
 - `gitops/bootstrap/argocd-self-application.yaml` defines the long-term Argo CD
   self-management `Application`, but it is intentionally not auto-synced yet.
+- `gitops/bootstrap/argo-apps-application.yaml` creates the `platform-app-of-apps`
+  child `Application` from `https://github.com/pasmon/argo-apps.git`, connecting
+  the production workload tree after bootstrap.
 
 ## Self-management handoff
 
