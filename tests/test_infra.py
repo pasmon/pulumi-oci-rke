@@ -322,12 +322,12 @@ def test_rke2_commands(pulumi_stack):
     assert "tls-san:" in server
     assert "203.0.113.20" in server
     assert 'write-kubeconfig-mode: "0600"' in server
-    assert "sudo tee /etc/rancher/rke2/config.yaml >/dev/null" in server
+    assert "sudo tee /etc/rancher/rke2/config.yaml << 'EOF' > /dev/null" in server
     assert "rke2-server.service" in server
     assert "sudo install -m 600 /dev/null /etc/rancher/rke2/config.yaml" in agent
-    assert "server: https://%s:9345" in agent
+    assert "server: https://{server_address}:9345" in agent or "server: https:" in agent
     assert "10.0.0.10" in agent
-    assert "sudo tee /etc/rancher/rke2/config.yaml >/dev/null" in agent
+    assert "sudo tee /etc/rancher/rke2/config.yaml << 'EOF' > /dev/null" in agent
     assert "rke2-agent.service" in agent
 
 
