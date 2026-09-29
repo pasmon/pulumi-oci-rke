@@ -5,6 +5,7 @@
 import asyncio
 import base64
 import importlib.util
+import json
 import os
 import shutil
 import tempfile
@@ -49,9 +50,28 @@ class PulumiMocks(pulumi.runtime.Mocks):
         return {}
 
 
-@pytest.fixture(scope="session")
-def pulumi_stack():
-    """Fixture that initializes Pulumi with mocks and loads the stack from __main__.py."""
+BASE_STACK_CONFIG = {
+    "oci-rke-provision:compartment-id": "ocid1.compartment.oc1..test",
+    "oci-rke-provision:rke2-version": "v1.34.1+rke2r1",
+    "oci-rke-provision:rke2-token": "test-rke2-token",
+    "oci-rke-provision:argocd-repo-url": "https://github.com/pasmon/pulumi-oci-rke.git",
+    "oci-rke-provision:argocd-repo-target-revision": "main",
+    "oci-rke-provision:argocd-repo-path": "gitops/bootstrap",
+    "oci-rke-provision:argocd-repo-username": "git",
+    "oci-rke-provision:argocd-repo-password": "test-password",
+}
+
+WIREGUARD_STACK_CONFIG = {
+    "oci-rke-provision:wireguard-peer-endpoint": "198.51.100.7",
+    "oci-rke-provision:wireguard-peer-public-key": "peerPublicKey=",
+    "oci-rke-provision:wireguard-private-key": "sharedPrivateKey=",
+    "oci-rke-provision:wireguard-preshared-key": "sharedPresharedKey=",
+    "oci-rke-provision:wireguard-allowed-cidrs": ["192.168.88.200/32"],
+}
+
+
+def load_stack(stack_config):
+    """Load __main__.py under Pulumi mocks using the supplied config keys."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -64,22 +84,15 @@ def pulumi_stack():
     with open(ssh_pub_key_path, "w", encoding="utf-8") as f:
         f.write("dummy-public-key-data")
 
-    os.environ["PULUMI_CONFIG"] = (
-        '{"oci-rke-provision:ssh-key-path":"'
-        + ssh_key_path.replace("\\", "\\\\")
-        + '",'
-        '"oci-rke-provision:ssh-public-key-path":"'
-        + ssh_pub_key_path.replace("\\", "\\\\")
-        + '",'
-        '"oci-rke-provision:compartment-id":"ocid1.compartment.oc1..test",'
-        '"oci-rke-provision:rke2-version":"v1.34.1+rke2r1",'
-        '"oci-rke-provision:rke2-token":"test-rke2-token",'
-        '"oci-rke-provision:argocd-repo-url":"https://github.com/pasmon/pulumi-oci-rke.git",'
-        '"oci-rke-provision:argocd-repo-target-revision":"main",'
-        '"oci-rke-provision:argocd-repo-path":"gitops/bootstrap",'
-        '"oci-rke-provision:argocd-repo-username":"git",'
-        '"oci-rke-provision:argocd-repo-password":"test-password"}'
-    )
+    config_values = dict(stack_config)
+    config_values["oci-rke-provision:ssh-key-path"] = ssh_key_path
+    config_values["oci-rke-provision:ssh-public-key-path"] = ssh_pub_key_path
+    # Pulumi decodes object-typed config values from JSON strings.
+    config_values = {
+        key: value if isinstance(value, str) else json.dumps(value)
+        for key, value in config_values.items()
+    }
+    os.environ["PULUMI_CONFIG"] = json.dumps(config_values)
 
     pulumi.runtime.set_mocks(PulumiMocks(), project="oci-rke-provision", stack="test")
 
@@ -89,14 +102,33 @@ def pulumi_stack():
     infra = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(infra)
 
-    yield infra
+    return infra, temp_dir
 
+
+def unload_stack(temp_dir):
+    """Clean up the files created while loading a stack."""
     shutil.rmtree(temp_dir, ignore_errors=True)
     if os.path.exists("out/rke2_kubeconfig"):
         try:
             os.remove("out/rke2_kubeconfig")
         except OSError:
             pass
+
+
+@pytest.fixture(scope="session")
+def pulumi_stack():
+    """Fixture that initializes Pulumi with mocks and loads the stack from __main__.py."""
+    infra, temp_dir = load_stack(BASE_STACK_CONFIG)
+    yield infra
+    unload_stack(temp_dir)
+
+
+@pytest.fixture(scope="session")
+def wireguard_stack():
+    """Fixture that loads the stack with the optional Wireguard tunnel configured."""
+    infra, temp_dir = load_stack({**BASE_STACK_CONFIG, **WIREGUARD_STACK_CONFIG})
+    yield infra
+    unload_stack(temp_dir)
 
 
 def test_user_data_configuration(pulumi_stack):
@@ -496,3 +528,134 @@ def test_rke2_ingress_rules(pulumi_stack):
         pulumi_stack.security_group_security_rule6.source,
         pulumi_stack.security_group_security_rule6.udp_options,
     ).apply(check_rules)
+
+
+def test_wireguard_disabled_without_endpoint(pulumi_stack):
+    """Test the optional Wireguard tunnel stays unconfigured when unset."""
+    assert pulumi_stack.wireguard_peer_endpoint is None
+    assert pulumi_stack.wireguard_master is None
+    assert pulumi_stack.wireguard_worker is None
+
+
+def test_wireguard_defaults(wireguard_stack):
+    """Test the Wireguard subnet and port defaults."""
+    assert wireguard_stack.wireguard_subnet_cidr == "10.99.0.0/24"
+    assert wireguard_stack.wireguard_listen_port == "51820"
+    assert wireguard_stack.WIREGUARD_POD_CIDR == "10.42.0.0/16"
+    assert wireguard_stack.WIREGUARD_PERSISTENT_KEEPALIVE == 25
+
+
+def test_wireguard_node_addresses(wireguard_stack):
+    """Test the tunnel addresses derived from the subnet CIDR."""
+    assert wireguard_stack.WIREGUARD_MASTER_ADDRESS == "10.99.0.2/24"
+    assert wireguard_stack.WIREGUARD_WORKER_ADDRESS == "10.99.0.3/24"
+
+
+def test_wireguard_addresses_follow_subnet(wireguard_stack):
+    """Test a custom subnet shifts the derived node addresses."""
+    assert wireguard_stack.wireguard_node_addresses("10.88.5.0/24") == (
+        "10.88.5.2/24",
+        "10.88.5.3/24",
+    )
+    assert wireguard_stack.wireguard_node_addresses("10.88.0.0/16") == (
+        "10.88.0.2/16",
+        "10.88.0.3/16",
+    )
+
+
+def test_wireguard_resources(wireguard_stack):
+    """Test both node tunnels are created when the endpoint is configured."""
+    assert wireguard_stack.wireguard_master is not None
+    assert wireguard_stack.wireguard_worker is not None
+    assert wireguard_stack.wireguard_peer_endpoint == "198.51.100.7"
+
+
+def test_wireguard_command_interface(wireguard_stack):
+    """Test the rendered wg0 interface, permissions, and sysctl configuration."""
+    command = wireguard_stack.wireguard_command(
+        "10.99.0.2/24", "sharedPrivateKey=", "sharedPresharedKey="
+    )
+    assert "Address = 10.99.0.2/24" in command
+    assert "ListenPort = 51820" in command
+    assert "PrivateKey = sharedPrivateKey=" in command
+    assert "sudo chmod 600 /etc/wireguard/wg0.conf" in command
+    assert "sudo install -d -m 700 /etc/wireguard" in command
+    assert "net.ipv4.ip_forward = 1" in command
+    assert "sudo systemctl enable wg-quick@wg0" in command
+    assert "sudo systemctl is-active --wait wg-quick@wg0" in command
+
+
+def test_wireguard_command_peer(wireguard_stack):
+    """Test the rendered peer, shared key material, and NAT-traversal settings."""
+    command = wireguard_stack.wireguard_command(
+        "10.99.0.3/24", "sharedPrivateKey=", "sharedPresharedKey="
+    )
+    assert "PublicKey = peerPublicKey=" in command
+    assert "PresharedKey = sharedPresharedKey=" in command
+    assert "Endpoint = 198.51.100.7:51820" in command
+    assert "PersistentKeepalive = 25" in command
+
+
+def test_wireguard_allowed_ips_routes_lan_prefix(wireguard_stack):
+    """Test the LAN prefixes are included in AllowedIPs for crypto-routing."""
+    assert (
+        wireguard_stack.wireguard_allowed_ips() == "10.99.0.0/24, 192.168.88.200/32"
+    )
+    command = wireguard_stack.wireguard_command(
+        "10.99.0.2/24", "sharedPrivateKey=", "sharedPresharedKey="
+    )
+    assert "AllowedIPs = 10.99.0.0/24, 192.168.88.200/32" in command
+
+
+def test_wireguard_allowed_ips_without_extra_cidrs(pulumi_stack):
+    """Test AllowedIPs still contains the tunnel subnet when no LAN routes exist."""
+    assert pulumi_stack.wireguard_allowed_ips() == "10.99.0.0/24"
+
+
+def test_wireguard_command_masquerades_pod_traffic(wireguard_stack):
+    """Test pod traffic is masqueraded so the tunes API sees a tunnel address."""
+    command = wireguard_stack.wireguard_command(
+        "10.99.0.2/24", "sharedPrivateKey=", "sharedPresharedKey="
+    )
+    assert (
+        "PostUp = iptables -t nat -A POSTROUTING -s 10.42.0.0/16 "
+        "-o wg0 -j MASQUERADE" in command
+    )
+    assert "PostUp = iptables -I FORWARD -i wg0 -j ACCEPT" in command
+    assert (
+        "PostDown = iptables -t nat -D POSTROUTING -s 10.42.0.0/16 "
+        "-o wg0 -j MASQUERADE" in command
+    )
+    assert "PostDown = iptables -D FORWARD -i wg0 -j ACCEPT" in command
+
+
+def test_wireguard_rejects_invalid_cidr():
+    """Test malformed AllowedIPs entries fail validation."""
+    with pytest.raises(ValueError, match="Invalid Wireguard CIDR"):
+        load_stack(
+            {
+                **BASE_STACK_CONFIG,
+                **WIREGUARD_STACK_CONFIG,
+                "oci-rke-provision:wireguard-allowed-cidrs": ["192.168.88.200/33"],
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "incomplete_config",
+    [
+        {
+            "oci-rke-provision:wireguard-peer-endpoint": "198.51.100.7",
+        },
+        {
+            "oci-rke-provision:wireguard-peer-endpoint": "198.51.100.7",
+            "oci-rke-provision:wireguard-peer-public-key": "peerPublicKey=",
+            "oci-rke-provision:wireguard-private-key": "sharedPrivateKey=",
+        },
+    ],
+    ids=["missing-peer-material", "missing-preshared-key"],
+)
+def test_wireguard_requires_peer_material(incomplete_config):
+    """Test the tunnel rejects partial peer configuration."""
+    with pytest.raises(ValueError, match="wireguard"):
+        load_stack({**BASE_STACK_CONFIG, **incomplete_config})
