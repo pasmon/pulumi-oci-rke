@@ -598,9 +598,7 @@ def test_wireguard_command_peer(wireguard_stack):
 
 def test_wireguard_allowed_ips_routes_lan_prefix(wireguard_stack):
     """Test the LAN prefixes are included in AllowedIPs for crypto-routing."""
-    assert (
-        wireguard_stack.wireguard_allowed_ips() == "10.99.0.0/24, 192.168.88.200/32"
-    )
+    assert wireguard_stack.wireguard_allowed_ips() == "10.99.0.0/24, 192.168.88.200/32"
     command = wireguard_stack.wireguard_command(
         "10.99.0.2/24", "sharedPrivateKey=", "sharedPresharedKey="
     )

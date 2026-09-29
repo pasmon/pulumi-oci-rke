@@ -57,6 +57,7 @@ def wireguard_allowed_ips():
     """
     return ", ".join([wireguard_subnet_cidr, *wireguard_allowed_cidrs])
 
+
 with open(ssh_key_path, "r", encoding="utf-8") as ssh_key_file:
     ssh_key_data = ssh_key_file.read()
 
@@ -525,9 +526,7 @@ if wireguard_peer_endpoint is not None:
             private_key=ssh_key_data,
             user="ubuntu",
         ),
-        create=pulumi.Output.all(
-            wireguard_private_key, wireguard_preshared_key
-        ).apply(
+        create=pulumi.Output.all(wireguard_private_key, wireguard_preshared_key).apply(
             lambda values: wireguard_command(
                 WIREGUARD_MASTER_ADDRESS, values[0], values[1]
             )
@@ -542,9 +541,7 @@ if wireguard_peer_endpoint is not None:
             private_key=ssh_key_data,
             user="ubuntu",
         ),
-        create=pulumi.Output.all(
-            wireguard_private_key, wireguard_preshared_key
-        ).apply(
+        create=pulumi.Output.all(wireguard_private_key, wireguard_preshared_key).apply(
             lambda values: wireguard_command(
                 WIREGUARD_WORKER_ADDRESS, values[0], values[1]
             )
