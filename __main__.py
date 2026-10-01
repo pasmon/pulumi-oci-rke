@@ -1,6 +1,7 @@
 """Pulumi program to deploy an RKE2 cluster to two free-tier OCI nodes."""
 
 import base64
+import ipaddress
 import os
 import re
 import shlex
@@ -26,10 +27,36 @@ argocd_github_app_id = config.get("argocd-github-app-id")
 argocd_github_app_installation_id = config.get("argocd-github-app-installation-id")
 argocd_github_app_private_key = config.get_secret("argocd-github-app-private-key")
 
+wireguard_peer_endpoint = config.get("wireguard-peer-endpoint")
+wireguard_peer_public_key = config.get("wireguard-peer-public-key")
+wireguard_private_key = config.get_secret("wireguard-private-key")
+wireguard_preshared_key = config.get_secret("wireguard-preshared-key")
+wireguard_subnet_cidr = config.get("wireguard-subnet-cidr") or "10.99.0.0/24"
+wireguard_listen_port = config.get("wireguard-listen-port") or "51820"
+wireguard_allowed_cidrs = config.get_object("wireguard-allowed-cidrs") or []
+
 ARGOCD_NAMESPACE = "argocd"
 ARGOCD_HELM_REPO = "https://argoproj.github.io/argo-helm"
 ARGOCD_HELM_CHART = "argo-cd"
 ARGOCD_HELM_VERSION = "8.3.3"
+
+WIREGUARD_INTERFACE = "wg0"
+# RKE2 flannel pod network. Pods reach the tunnel through the node and are
+# masqueraded so LAN services see the node's wg0 address instead of a pod IP.
+WIREGUARD_POD_CIDR = "10.42.0.0/16"
+WIREGUARD_PERSISTENT_KEEPALIVE = 25
+
+
+def wireguard_allowed_ips():
+    """Build the peer's AllowedIPs list for crypto-routing.
+
+    WireGuard only sends a packet into the tunnel when its destination matches
+    an AllowedIPs entry, so this list is what makes the routed LAN prefixes
+    reachable. The tunnel subnet is always included so the peer itself stays
+    reachable, and any extra prefixes follow.
+    """
+    return ", ".join([wireguard_subnet_cidr, *wireguard_allowed_cidrs])
+
 
 with open(ssh_key_path, "r", encoding="utf-8") as ssh_key_file:
     ssh_key_data = ssh_key_file.read()
@@ -394,6 +421,60 @@ sudo systemctl is-active --wait rke2-agent.service
 """
 
 
+def wireguard_node_addresses(subnet_cidr):
+    """Derive the master and worker tunnel addresses from the subnet CIDR.
+
+    The peer router takes the first usable address, so the master is the
+    second address in the subnet and the worker is the third.
+    """
+    network = ipaddress.ip_network(subnet_cidr, strict=False)
+    base = network.network_address
+    return (
+        f"{base + 2}/{network.prefixlen}",
+        f"{base + 3}/{network.prefixlen}",
+    )
+
+
+WIREGUARD_MASTER_ADDRESS, WIREGUARD_WORKER_ADDRESS = wireguard_node_addresses(
+    wireguard_subnet_cidr
+)
+
+
+def wireguard_command(address, private_key, preshared_key):
+    """Build the Wireguard client setup command for an RKE2 node."""
+    return f"""set -eu
+sudo apt-get update
+sudo apt-get install -y wireguard-tools
+sudo install -d -m 700 /etc/wireguard
+sudo install -m 644 /dev/null /etc/sysctl.d/99-{WIREGUARD_INTERFACE}.conf
+sudo tee /etc/sysctl.d/99-{WIREGUARD_INTERFACE}.conf << 'EOF' > /dev/null
+net.ipv4.ip_forward = 1
+EOF
+sudo sysctl --system > /dev/null
+sudo tee /etc/wireguard/{WIREGUARD_INTERFACE}.conf << 'EOF' > /dev/null
+[Interface]
+Address = {address}
+ListenPort = {wireguard_listen_port}
+PrivateKey = {private_key}
+PostUp = iptables -t nat -A POSTROUTING -s {WIREGUARD_POD_CIDR} -o {WIREGUARD_INTERFACE} -j MASQUERADE
+PostUp = iptables -I FORWARD -i {WIREGUARD_INTERFACE} -j ACCEPT
+PostDown = iptables -t nat -D POSTROUTING -s {WIREGUARD_POD_CIDR} -o {WIREGUARD_INTERFACE} -j MASQUERADE
+PostDown = iptables -D FORWARD -i {WIREGUARD_INTERFACE} -j ACCEPT
+
+[Peer]
+PublicKey = {wireguard_peer_public_key}
+PresharedKey = {preshared_key}
+Endpoint = {wireguard_peer_endpoint}:{wireguard_listen_port}
+AllowedIPs = {wireguard_allowed_ips()}
+PersistentKeepalive = {WIREGUARD_PERSISTENT_KEEPALIVE}
+EOF
+sudo chmod 600 /etc/wireguard/{WIREGUARD_INTERFACE}.conf
+sudo systemctl enable wg-quick@{WIREGUARD_INTERFACE}
+sudo systemctl restart wg-quick@{WIREGUARD_INTERFACE}
+sudo systemctl is-active --wait wg-quick@{WIREGUARD_INTERFACE}
+"""
+
+
 rke2_server = remote.Command(
     "rke2-server",
     connection=remote.ConnectionArgs(
@@ -419,6 +500,54 @@ rke2_agent = remote.Command(
     ),
     opts=pulumi.ResourceOptions(depends_on=[vm2_ready, rke2_server]),
 )
+
+wireguard_master = None
+wireguard_worker = None
+if wireguard_peer_endpoint is not None:
+    if wireguard_peer_public_key is None or wireguard_private_key is None:
+        raise ValueError(
+            "Set wireguard-peer-endpoint, wireguard-peer-public-key, and "
+            "wireguard-private-key together, or omit them all."
+        )
+    if wireguard_preshared_key is None:
+        raise ValueError(
+            "Set wireguard-preshared-key when wireguard-peer-endpoint is configured."
+        )
+    try:
+        for cidr in [wireguard_subnet_cidr, *wireguard_allowed_cidrs]:
+            ipaddress.ip_network(cidr, strict=False)
+    except ValueError as error:
+        raise ValueError(f"Invalid Wireguard CIDR: {error}") from error
+
+    wireguard_master = remote.Command(
+        "wireguard-master",
+        connection=remote.ConnectionArgs(
+            host=vm1.public_ip,
+            private_key=ssh_key_data,
+            user="ubuntu",
+        ),
+        create=pulumi.Output.all(wireguard_private_key, wireguard_preshared_key).apply(
+            lambda values: wireguard_command(
+                WIREGUARD_MASTER_ADDRESS, values[0], values[1]
+            )
+        ),
+        opts=pulumi.ResourceOptions(depends_on=[vm1_ready, rke2_server]),
+    )
+
+    wireguard_worker = remote.Command(
+        "wireguard-worker",
+        connection=remote.ConnectionArgs(
+            host=vm2.public_ip,
+            private_key=ssh_key_data,
+            user="ubuntu",
+        ),
+        create=pulumi.Output.all(wireguard_private_key, wireguard_preshared_key).apply(
+            lambda values: wireguard_command(
+                WIREGUARD_WORKER_ADDRESS, values[0], values[1]
+            )
+        ),
+        opts=pulumi.ResourceOptions(depends_on=[vm2_ready, rke2_agent]),
+    )
 
 rke2_kubeconfig = remote.Command(
     "rke2-kubeconfig",
@@ -539,3 +668,10 @@ pulumi.export("worker_pip", vm2.public_ip)
 pulumi.export("rke2_version", rke2_version)
 pulumi.export("argocd_namespace", ARGOCD_NAMESPACE)
 pulumi.export("argocd_bootstrap_application", argocd_root_application.metadata["name"])
+pulumi.export("wireguard_enabled", wireguard_peer_endpoint is not None)
+if wireguard_peer_endpoint is not None:
+    pulumi.export("wireguard_subnet_cidr", wireguard_subnet_cidr)
+    pulumi.export("wireguard_listen_port", wireguard_listen_port)
+    pulumi.export("wireguard_master_address", WIREGUARD_MASTER_ADDRESS)
+    pulumi.export("wireguard_worker_address", WIREGUARD_WORKER_ADDRESS)
+    pulumi.export("wireguard_allowed_ips", wireguard_allowed_ips())
