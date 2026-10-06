@@ -68,7 +68,7 @@ replaced by this deployment rather than upgraded in place.
 
    Optional SSH credentials for a private Git repository:
 
-   `pulumi config set --secret argocd-repo-ssh-private-key @<path to SSH private key>`
+   `Get-Content -Raw <path to SSH private key> | pulumi config set --secret --raw argocd-repo-ssh-private-key`
 
    Optional GitHub App credentials for a private GitHub repository:
 
@@ -76,7 +76,11 @@ replaced by this deployment rather than upgraded in place.
 
    `pulumi config set argocd-github-app-installation-id <GitHub App installation ID>`
 
-   `pulumi config set --secret argocd-github-app-private-key @<path to GitHub App PEM private key>`
+   `Get-Content -Raw <path to GitHub App PEM private key> | pulumi config set --secret --raw argocd-github-app-private-key`
+
+   `pulumi config set` has no `@file` syntax: passing `@<path>` stores that
+   literal string as the value, and Argo CD then fails with
+   `Key must be a PEM encoded PKCS1 or PKCS8 key`. Pipe the file instead.
 
    Configure only one authentication mode for Argo CD repository access:
    HTTPS credentials, SSH private key, or GitHub App credentials.
